@@ -1,0 +1,10 @@
+{
+  "name": "rpi-led-websocket-backend",
+  "version": "1.0.0",
+  "private": true,
+  "description": "WebSocket relay for the Raspberry Pi LED controller",
+  "main": "src/server.js",
+  "scripts": { "start": "node src/server.js", "dev": "node --watch src/server.js", "test": "node --test" },
+  "engines": { "node": ">=18" },
+  "dependencies": { "ws": "^8.18.3" }
+}

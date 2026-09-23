@@ -1,0 +1,23 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#111827"><title>Pi LED Controller</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <main class="shell">
+    <header>
+      <div><p class="eyebrow">Raspberry Pi 4</p><h1>LED controller</h1><p class="subtitle">Real-time GPIO control over WebSocket</p></div>
+      <div class="statuses"><span id="server-status" class="badge offline">Server offline</span><span id="pi-status" class="badge offline">Pi offline</span></div>
+    </header>
+    <section class="toolbar" aria-label="All LEDs"><button id="all-on" class="primary">Turn all on</button><button id="all-off">Turn all off</button></section>
+    <section id="led-grid" class="led-grid" aria-label="LED controls"></section>
+    <details class="settings"><summary>Connection settings</summary>
+      <form id="settings-form"><label>WebSocket URL<input id="ws-url" type="url" required></label><label>Controller token<input id="token" type="password" autocomplete="off"></label><button type="submit">Save and reconnect</button></form>
+    </details>
+    <p id="message" class="message" role="status"></p>
+  </main>
+  <script src="app.js"></script>
+</body>
+</html>
