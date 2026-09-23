@@ -1,5 +1,7 @@
 const http = require("node:http");
 const { randomUUID } = require("node:crypto");
+const { createReadStream, stat } = require("node:fs");
+const path = require("node:path");
 const { WebSocketServer, WebSocket } = require("ws");
 const { initialState, parseMessage, validateSetLed, validateSetAll } = require("./protocol");
 
@@ -10,12 +12,45 @@ const CONTROLLER_TOKEN = process.env.CONTROLLER_TOKEN || "";
 let leds = initialState();
 let piOnline = false;
 
+const FRONTEND_DIR = path.resolve(__dirname, "../public");
+const STATIC_FILES = {
+  "/": ["index.html", "text/html; charset=utf-8"],
+  "/index.html": ["index.html", "text/html; charset=utf-8"],
+  "/styles.css": ["styles.css", "text/css; charset=utf-8"],
+  "/app.js": ["app.js", "text/javascript; charset=utf-8"],
+};
+
+function serveStatic(request, response) {
+  const pathname = new URL(request.url, "http://localhost").pathname;
+  const entry = STATIC_FILES[pathname];
+  if (!entry || !["GET", "HEAD"].includes(request.method)) return false;
+
+  const [filename, contentType] = entry;
+  const filePath = path.join(FRONTEND_DIR, filename);
+  stat(filePath, (error, fileStat) => {
+    if (error || !fileStat.isFile()) {
+      response.writeHead(404, { "content-type": "application/json" });
+      response.end(JSON.stringify({ error: "Frontend file not found" }));
+      return;
+    }
+    response.writeHead(200, {
+      "content-type": contentType,
+      "content-length": fileStat.size,
+      "cache-control": "no-cache",
+    });
+    if (request.method === "HEAD") response.end();
+    else createReadStream(filePath).pipe(response);
+  });
+  return true;
+}
+
 const server = http.createServer((request, response) => {
   if (request.url === "/health") {
     response.writeHead(200, { "content-type": "application/json" });
     response.end(JSON.stringify({ ok: true, piOnline, clients: wss.clients.size }));
     return;
   }
+  if (serveStatic(request, response)) return;
   response.writeHead(404, { "content-type": "application/json" });
   response.end(JSON.stringify({ error: "Not found" }));
 });
@@ -90,4 +125,7 @@ const heartbeat = setInterval(() => {
   }
 }, 30000);
 wss.on("close", () => clearInterval(heartbeat));
-server.listen(PORT, HOST, () => console.log(`HTTP/WebSocket server listening on ${HOST}:${PORT}`));
+server.listen(PORT, HOST, () => {
+  console.log(`Controller: http://localhost:${PORT}`);
+  console.log(`WebSocket: ws://localhost:${PORT}/ws`);
+});

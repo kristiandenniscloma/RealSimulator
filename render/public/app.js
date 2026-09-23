@@ -1,4 +1,4 @@
-const defaultUrl = `${location.protocol === "https:" ? "wss" : "ws"}://${location.hostname || "localhost"}:3000/ws`;
+const defaultUrl = `${location.protocol === "https:" ? "wss" : "ws"}://${location.host || "localhost:3000"}/ws`;
 const settings = { url: localStorage.getItem("wsUrl") || defaultUrl, token: localStorage.getItem("controllerToken") || "" };
 const grid = document.querySelector("#led-grid");
 const serverStatus = document.querySelector("#server-status");

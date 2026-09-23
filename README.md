@@ -4,8 +4,7 @@ A small end-to-end starter app for controlling four Raspberry Pi LEDs through a
 cloud-hosted WebSocket server.
 
 ```text
-frontend/  -> browser controller UI
-backend/   -> WebSocket relay and shared LED state
+backend/   -> frontend, web server, WebSocket relay, and shared LED state
 rpi4/      -> Raspberry Pi GPIO client
 ```
 
@@ -37,15 +36,9 @@ You need Node.js 18+ and Python 3.10+.
    MOCK_GPIO=true python client.py
    ```
 
-3. Serve the frontend in another terminal:
-
-   ```bash
-   cd frontend
-   python3 -m http.server 8080
-   ```
-
-4. Open <http://localhost:8080>. It connects to `ws://localhost:3000/ws` by
-   default. Use the settings panel to change the URL when the backend is hosted.
+3. Open <http://localhost:3000>. The backend serves the frontend and the
+   browser automatically connects to its `/ws` endpoint. Use the settings panel
+   only when you need to connect the UI to another backend.
 
 See each folder's README for deployment, wiring, and configuration details.
 
