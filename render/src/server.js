@@ -7,7 +7,6 @@ const { initialState, parseMessage, validateSetLed, validateSetAll } = require("
 
 const PORT = Number(process.env.PORT || 3000);
 const HOST = process.env.HOST || "0.0.0.0";
-const DEVICE_TOKEN = process.env.DEVICE_TOKEN || "";
 const CONTROLLER_TOKEN = process.env.CONTROLLER_TOKEN || "";
 let leds = initialState();
 let piOnline = false;
@@ -61,9 +60,8 @@ function send(socket, payload) {
 }
 function broadcast(payload) { for (const client of wss.clients) send(client, payload); }
 function broadcastState() { broadcast({ type: "state", leds, piOnline, timestamp: new Date().toISOString() }); }
-function authorized(role, token) {
-  const expected = role === "device" ? DEVICE_TOKEN : CONTROLLER_TOKEN;
-  return !expected || token === expected;
+function controllerAuthorized(token) {
+  return !CONTROLLER_TOKEN || token === CONTROLLER_TOKEN;
 }
 
 wss.on("connection", (socket) => {
@@ -79,7 +77,7 @@ wss.on("connection", (socket) => {
     const message = parsed.message;
     if (!socket.role) {
       if (message.type !== "auth" || !["controller", "device"].includes(message.role)) return send(socket, { type: "error", message: "Authenticate first" });
-      if (!authorized(message.role, message.token || "")) {
+      if (message.role === "controller" && !controllerAuthorized(message.token || "")) {
         send(socket, { type: "error", message: "Invalid token" });
         return socket.close(4003, "Unauthorized");
       }

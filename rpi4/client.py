@@ -6,8 +6,7 @@ from contextlib import suppress
 
 from websockets.asyncio.client import connect
 
-WS_URL = os.getenv("WS_URL", "ws://localhost:3000/ws")
-DEVICE_TOKEN = os.getenv("DEVICE_TOKEN", "")
+WS_URL = os.getenv("WS_URL", "wss://realsimulator.onrender.com/ws")
 PINS = [int(value) for value in os.getenv("GPIO_PINS", "17,27,22,23").split(",")]
 MOCK_GPIO = os.getenv("MOCK_GPIO", "").lower() in {"1", "true", "yes"}
 if len(PINS) != 4:
@@ -46,7 +45,7 @@ async def run(board):
         try:
             logging.info("Connecting to %s", WS_URL)
             async with connect(WS_URL, ping_interval=20, ping_timeout=20) as socket:
-                await socket.send(json.dumps({"type": "auth", "role": "device", "token": DEVICE_TOKEN}))
+                await socket.send(json.dumps({"type": "auth", "role": "device"}))
                 delay = 1
                 async for raw in socket:
                     message = json.loads(raw)

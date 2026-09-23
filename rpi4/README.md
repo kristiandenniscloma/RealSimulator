@@ -18,15 +18,15 @@ to GPIO. The program uses active-high outputs.
 ```bash
 python3 -m venv .venv
 source .venv/bin/activate
-pip install -r requirements.txt
-WS_URL=wss://your-backend.example/ws DEVICE_TOKEN=change-me python client.py
+python -m pip install -r requirements.txt
+python client.py
 ```
 
 | Variable | Default | Purpose |
 | --- | --- | --- |
-| `WS_URL` | `ws://localhost:3000/ws` | Cloud WebSocket URL |
-| `DEVICE_TOKEN` | empty | Must match the backend token |
+| `WS_URL` | `wss://realsimulator.onrender.com/ws` | Cloud WebSocket URL |
 | `GPIO_PINS` | `17,27,22,23` | Four BCM GPIO numbers |
 | `MOCK_GPIO` | false | Set `true` to run without hardware |
 
-The client reconnects with exponential backoff. Ctrl+C turns outputs off.
+The Pi connects without a device token and reconnects with exponential backoff.
+Ctrl+C turns outputs off.

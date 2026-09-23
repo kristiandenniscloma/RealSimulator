@@ -15,10 +15,9 @@ npm start
 | --- | --- | --- |
 | `PORT` | `3000` | HTTP/WebSocket port |
 | `HOST` | `0.0.0.0` | Listen address |
-| `DEVICE_TOKEN` | empty | Required Pi authentication token |
 | `CONTROLLER_TOKEN` | empty | Required browser authentication token |
 
 Open <http://localhost:3000> after starting it. Other endpoints are `GET
-/health` and WebSocket `/ws`. For cloud deployment, set both tokens and
-configure the Pi with the resulting `wss://` URL. State is kept in memory and
-resets when the server restarts.
+/health` and WebSocket `/ws`. Raspberry Pi devices connect without a token. For
+cloud deployment, optionally set `CONTROLLER_TOKEN` to protect the controls.
+State is kept in memory and resets when the server restarts.
