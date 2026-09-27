@@ -4,6 +4,7 @@ const { createReadStream, stat } = require("node:fs");
 const path = require("node:path");
 require("dotenv").config({ path: path.resolve(__dirname, "../../.env"), quiet: true });
 const { AccessToken } = require("livekit-server-sdk");
+const { createClient } = require("@supabase/supabase-js");
 const { WebSocketServer, WebSocket } = require("ws");
 const { initialState, parseMessage, validateSetLed, validateSetAll } = require("./protocol");
 
@@ -13,7 +14,12 @@ const CONTROLLER_TOKEN = process.env.CONTROLLER_TOKEN || "";
 const LIVEKIT_URL = process.env.LIVEKIT_URL || "";
 const LIVEKIT_API_KEY = process.env.LIVEKIT_API_KEY || "";
 const LIVEKIT_API_SECRET = process.env.LIVEKIT_API_SECRET || "";
-const LIVEKIT_ROOM = process.env.LIVEKIT_ROOM || "rpi-camera";
+const LIVEKIT_ROOM = process.env.LIVEKIT_ROOM || "camera-hub";
+const SUPABASE_URL = process.env.SUPABASE_URL || "";
+const SUPABASE_SECRET_KEY = process.env.SUPABASE_SECRET_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY || "";
+const supabase = SUPABASE_URL && SUPABASE_SECRET_KEY
+  ? createClient(SUPABASE_URL, SUPABASE_SECRET_KEY, { auth: { persistSession: false } })
+  : null;
 let leds = initialState();
 let piOnline = false;
 
@@ -49,24 +55,110 @@ function serveStatic(request, response) {
   return true;
 }
 
+function apiHeaders(extra = {}) {
+  return {
+    "content-type": "application/json",
+    "access-control-allow-origin": "*",
+    "access-control-allow-methods": "GET, POST, OPTIONS",
+    "access-control-allow-headers": "content-type",
+    "cache-control": "no-store",
+    ...extra,
+  };
+}
+
+function readJson(request) {
+  return new Promise((resolve, reject) => {
+    let body = "";
+    request.on("data", (chunk) => {
+      body += chunk;
+      if (body.length > 16_384) request.destroy();
+    });
+    request.on("end", () => {
+      try { resolve(JSON.parse(body || "{}")); }
+      catch { reject(new Error("Request body must be valid JSON")); }
+    });
+    request.on("error", reject);
+  });
+}
+
+async function serveCameras(request, response) {
+  const requestUrl = new URL(request.url, "http://localhost");
+  if (requestUrl.pathname !== "/api/cameras") return false;
+  if (request.method === "OPTIONS") {
+    response.writeHead(204, apiHeaders());
+    response.end();
+    return true;
+  }
+  if (!supabase) {
+    response.writeHead(503, apiHeaders());
+    response.end(JSON.stringify({ error: "Supabase is not configured on the server" }));
+    return true;
+  }
+  if (request.method === "GET") {
+    const { data, error } = await supabase.from("cameras").select("*").order("name");
+    if (error) throw error;
+    const staleBefore = Date.now() - 20_000;
+    const cameras = data.map((camera) => ({
+      ...camera,
+      online: camera.enabled && new Date(camera.last_seen).getTime() >= staleBefore,
+    }));
+    response.writeHead(200, apiHeaders());
+    response.end(JSON.stringify({ cameras }));
+    return true;
+  }
+  if (request.method === "POST") {
+    const body = await readJson(request);
+    if (!/^[\w:.-]{1,200}$/.test(body.cameraId || "")) {
+      response.writeHead(400, apiHeaders());
+      response.end(JSON.stringify({ error: "A valid cameraId is required" }));
+      return true;
+    }
+    const camera = {
+      camera_id: body.cameraId,
+      name: String(body.name || "Camera").slice(0, 100),
+      track_name: String(body.trackName || "").slice(0, 200),
+      publisher_id: String(body.publisherId || "windows-webcam").slice(0, 200),
+      enabled: Boolean(body.enabled),
+      online: Boolean(body.enabled),
+      last_seen: new Date().toISOString(),
+    };
+    const { data, error } = await supabase
+      .from("cameras")
+      .upsert(camera, { onConflict: "camera_id" })
+      .select()
+      .single();
+    if (error) throw error;
+    response.writeHead(200, apiHeaders());
+    response.end(JSON.stringify({ camera: data }));
+    return true;
+  }
+  response.writeHead(405, apiHeaders({ allow: "GET, POST, OPTIONS" }));
+  response.end(JSON.stringify({ error: "Method not allowed" }));
+  return true;
+}
+
 async function serveLiveKitToken(request, response) {
   const requestUrl = new URL(request.url, "http://localhost");
   if (requestUrl.pathname !== "/api/livekit/token" || request.method !== "GET") return false;
 
   if (!LIVEKIT_URL || !LIVEKIT_API_KEY || !LIVEKIT_API_SECRET) {
-    response.writeHead(503, { "content-type": "application/json" });
+    response.writeHead(503, apiHeaders());
     response.end(JSON.stringify({ error: "LiveKit is not configured on the server" }));
     return true;
   }
 
   const role = requestUrl.searchParams.get("role");
   if (!["viewer", "camera"].includes(role)) {
-    response.writeHead(400, { "content-type": "application/json" });
+    response.writeHead(400, apiHeaders());
     response.end(JSON.stringify({ error: "role must be viewer or camera" }));
     return true;
   }
 
-  const identity = role === "camera" ? `rpi-camera-${randomUUID()}` : `viewer-${randomUUID()}`;
+  const requestedIdentity = requestUrl.searchParams.get("identity") || "";
+  const safeIdentity = requestedIdentity.replace(/[^\w:.-]/g, "").slice(0, 100);
+  const identity = role === "camera"
+    ? (safeIdentity || `windows-webcam-${randomUUID()}`)
+    : `viewer-${randomUUID()}`;
   const accessToken = new AccessToken(LIVEKIT_API_KEY, LIVEKIT_API_SECRET, {
     identity,
     name: role === "camera" ? "Raspberry Pi Camera" : "Web Viewer",
@@ -80,22 +172,25 @@ async function serveLiveKitToken(request, response) {
   });
 
   const token = await accessToken.toJwt();
-  response.writeHead(200, {
-    "content-type": "application/json",
-    "cache-control": "no-store",
-  });
+  response.writeHead(200, apiHeaders());
   response.end(JSON.stringify({ serverUrl: LIVEKIT_URL, participantToken: token, roomName: LIVEKIT_ROOM }));
   return true;
 }
 
 const server = http.createServer(async (request, response) => {
+  if (request.method === "OPTIONS" && request.url.startsWith("/api/")) {
+    response.writeHead(204, apiHeaders());
+    response.end();
+    return;
+  }
   if (request.url === "/health") {
     response.writeHead(200, { "content-type": "application/json" });
-    response.end(JSON.stringify({ ok: true, piOnline, clients: wss.clients.size }));
+    response.end(JSON.stringify({ ok: true, piOnline, clients: wss.clients.size, supabaseConfigured: Boolean(supabase) }));
     return;
   }
   try {
     if (await serveLiveKitToken(request, response)) return;
+    if (await serveCameras(request, response)) return;
   } catch (error) {
     console.error("LiveKit token error:", error.message);
     response.writeHead(500, { "content-type": "application/json" });

@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#08101d"><title>Real Simulator</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <main class="shell">
+    <header class="topbar">
+      <div><p class="eyebrow">Remote operations</p><h1>Real Simulator</h1><p class="subtitle">Live cameras and Raspberry Pi GPIO control</p></div>
+      <div class="statuses"><span id="server-status" class="badge offline">Server offline</span><span id="pi-status" class="badge offline">Pi offline</span></div>
+    </header>
+
+    <section class="camera-panel panel" aria-labelledby="camera-title">
+      <div class="section-heading">
+        <div><p class="eyebrow">LiveKit WebRTC</p><h2 id="camera-title">Live cameras</h2></div>
+        <span id="camera-status" class="badge offline">Video disconnected</span>
+      </div>
+      <div id="video-stage" class="video-grid"><p id="video-placeholder" class="empty-state">Start cameras from the Windows camera console, then connect.</p></div>
+      <div class="camera-actions"><button id="video-connect" class="primary">Connect cameras</button><button id="video-disconnect" disabled>Disconnect</button></div>
+    </section>
+
+    <section class="panel controls-panel" aria-labelledby="led-title">
+      <div class="section-heading">
+        <div><p class="eyebrow">WebSocket GPIO</p><h2 id="led-title">LED controls</h2></div>
+        <div class="toolbar" aria-label="All LEDs"><button id="all-on" class="primary">All on</button><button id="all-off">All off</button></div>
+      </div>
+      <section id="led-grid" class="led-grid" aria-label="LED controls"></section>
+    </section>
+
+    <details class="settings panel"><summary>Connection settings</summary>
+      <form id="settings-form"><label>WebSocket URL<input id="ws-url" type="url" required></label><label>Controller token<input id="token" type="password" autocomplete="off"></label><button type="submit">Save and reconnect</button></form>
+    </details>
+    <p id="message" class="message" role="status"></p>
+  </main>
+  <script src="https://cdn.jsdelivr.net/npm/livekit-client@2.22.3/dist/livekit-client.umd.min.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>

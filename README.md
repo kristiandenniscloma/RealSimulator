@@ -1,12 +1,13 @@
-# Raspberry Pi 4 LED WebSocket Controller
+# Real Simulator
 
 A small end-to-end starter app for controlling four Raspberry Pi LEDs through a
 cloud-hosted WebSocket server.
 
 ```text
-render/    -> frontend, web server, WebSocket relay, and shared LED state
+web/       -> Render server and mobile-friendly viewer/controller
 rpi4/      -> Raspberry Pi GPIO client
-webcam/    -> Windows USB-webcam LiveKit publisher
+webcam/    -> Windows multi-camera publishing console
+supabase/  -> camera registry schema
 ```
 
 ## Message flow
@@ -24,7 +25,7 @@ You need Node.js 18+ and Python 3.10+.
 1. Start the backend:
 
    ```bash
-   cd render
+   cd web
    npm install
    npm start
    ```
@@ -49,8 +50,16 @@ See each folder's README for deployment, wiring, and configuration details.
 
 The local `.env` must contain `LIVEKIT_URL`, `LIVEKIT_API_KEY`, and
 `LIVEKIT_API_SECRET`. Add the same variables to the Render service's Environment
-page before deploying. On Windows, follow `webcam/README.md` and run `python
-camera.py`. On the Mac, open the controller and press **Connect video**.
+page before deploying. On Windows, serve `webcam/` locally, scan the available
+cameras, and enable the streams you want. On the Mac, open the deployed
+controller and press **Connect cameras**.
+
+## Supabase camera management
+
+Run `supabase/camera_management.sql` in the Supabase SQL Editor. Add
+`SUPABASE_URL` and `SUPABASE_SECRET_KEY` to the Render environment. The secret
+key stays on the server; browsers access the camera registry only through the
+server API.
 
 ## Security note
 

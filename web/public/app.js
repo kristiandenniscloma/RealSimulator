@@ -50,21 +50,77 @@ const videoStage = document.querySelector("#video-stage");
 const videoPlaceholder = document.querySelector("#video-placeholder");
 const videoConnect = document.querySelector("#video-connect");
 const videoDisconnect = document.querySelector("#video-disconnect");
+const videoTracks = new Map();
+let cameraRegistry = new Map();
+let cameraPollTimer;
 
 function setCameraStatus(online, text) {
   setBadge(cameraStatus, online, [text, text]);
 }
 
-function attachVideo(track) {
+function renderVideoGrid() {
+  const names = new Set([...cameraRegistry.keys(), ...videoTracks.keys()]);
+  videoStage.replaceChildren();
+  if (!names.size) {
+    videoPlaceholder.hidden = false;
+    videoStage.appendChild(videoPlaceholder);
+    return;
+  }
+  videoPlaceholder.hidden = true;
+  for (const trackName of names) {
+    const registry = cameraRegistry.get(trackName);
+    const trackInfo = videoTracks.get(trackName);
+    const card = document.createElement("article");
+    card.className = "video-card";
+    const frame = document.createElement("div");
+    frame.className = "video-frame";
+    if (trackInfo) frame.appendChild(trackInfo.element);
+    else frame.textContent = registry?.online ? "Connecting to stream…" : "Camera offline";
+    const meta = document.createElement("div");
+    meta.className = "video-meta";
+    const name = document.createElement("span");
+    name.className = "video-name";
+    name.textContent = registry?.name || trackName;
+    const state = document.createElement("span");
+    const isLive = Boolean(trackInfo);
+    state.className = `badge ${isLive ? "online" : "offline"}`;
+    state.textContent = isLive ? "Live" : (registry?.enabled ? "Waiting" : "Off");
+    meta.append(name, state);
+    card.append(frame, meta);
+    videoStage.appendChild(card);
+  }
+}
+
+async function loadCameraRegistry() {
+  try {
+    const response = await fetch("/api/cameras", { cache: "no-store" });
+    if (!response.ok) return;
+    const { cameras } = await response.json();
+    cameraRegistry = new Map(cameras.map((camera) => [camera.track_name, camera]));
+    renderVideoGrid();
+  } catch {
+    // Video can still work if the optional registry is temporarily unavailable.
+  }
+}
+
+function attachVideo(track, publication) {
   if (track.kind !== LivekitClient.Track.Kind.Video) return;
-  for (const existing of videoStage.querySelectorAll("video")) existing.remove();
+  const name = publication.trackName || track.name || publication.trackSid;
   const video = track.attach();
   video.autoplay = true;
   video.playsInline = true;
   video.muted = true;
-  videoStage.appendChild(video);
-  videoPlaceholder.hidden = true;
-  setCameraStatus(true, "Camera live");
+  videoTracks.set(name, { track, element: video });
+  renderVideoGrid();
+  setCameraStatus(true, `${videoTracks.size} camera${videoTracks.size === 1 ? "" : "s"} live`);
+}
+
+function detachVideo(track, publication) {
+  const name = publication.trackName || track.name || publication.trackSid;
+  track.detach();
+  videoTracks.delete(name);
+  renderVideoGrid();
+  setCameraStatus(Boolean(videoTracks.size), videoTracks.size ? `${videoTracks.size} cameras live` : "Waiting for cameras");
 }
 
 async function connectVideo() {
@@ -78,9 +134,9 @@ async function connectVideo() {
     livekitRoom = new LivekitClient.Room({ adaptiveStream: true });
     livekitRoom
       .on(LivekitClient.RoomEvent.TrackSubscribed, attachVideo)
-      .on(LivekitClient.RoomEvent.TrackUnsubscribed, (track) => track.detach())
+      .on(LivekitClient.RoomEvent.TrackUnsubscribed, detachVideo)
       .on(LivekitClient.RoomEvent.ParticipantDisconnected, () => {
-        if (!videoStage.querySelector("video")) setCameraStatus(false, "Waiting for camera");
+        if (!videoTracks.size) setCameraStatus(false, "Waiting for cameras");
       })
       .on(LivekitClient.RoomEvent.Disconnected, () => {
         setCameraStatus(false, "Video disconnected");
@@ -88,8 +144,11 @@ async function connectVideo() {
         videoDisconnect.disabled = true;
       });
     await livekitRoom.connect(credentials.serverUrl, credentials.participantToken);
-    setCameraStatus(false, "Waiting for camera");
+    setCameraStatus(false, "Waiting for cameras");
     videoDisconnect.disabled = false;
+    await loadCameraRegistry();
+    clearInterval(cameraPollTimer);
+    cameraPollTimer = setInterval(loadCameraRegistry, 5000);
   } catch (error) {
     setCameraStatus(false, "Video connection failed");
     messageBox.textContent = error.message;
@@ -98,10 +157,12 @@ async function connectVideo() {
 }
 
 async function disconnectVideo() {
+  clearInterval(cameraPollTimer);
   if (livekitRoom) await livekitRoom.disconnect();
   livekitRoom = undefined;
-  for (const video of videoStage.querySelectorAll("video")) video.remove();
-  videoPlaceholder.hidden = false;
+  for (const { track } of videoTracks.values()) track.detach();
+  videoTracks.clear();
+  renderVideoGrid();
   setCameraStatus(false, "Video disconnected");
   videoConnect.disabled = false;
   videoDisconnect.disabled = true;
@@ -109,3 +170,4 @@ async function disconnectVideo() {
 
 videoConnect.addEventListener("click", connectVideo);
 videoDisconnect.addEventListener("click", disconnectVideo);
+loadCameraRegistry();

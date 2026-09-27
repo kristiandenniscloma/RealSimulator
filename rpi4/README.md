@@ -30,32 +30,3 @@ python client.py
 
 The Pi connects without a device token and reconnects with exponential backoff.
 Ctrl+C turns outputs off.
-
-## Live camera over WebRTC
-
-Install the Raspberry Pi camera package from Raspberry Pi OS, then create the
-virtual environment with access to system packages:
-
-```bash
-sudo apt update
-sudo apt install -y python3-picamera2
-deactivate 2>/dev/null || true
-python3 -m venv --system-site-packages .venv
-source .venv/bin/activate
-python -m pip install -r requirements.txt
-```
-
-Enable the camera in `sudo raspi-config` if your OS requires it, attach the
-camera, and start the publisher:
-
-```bash
-python camera.py
-```
-
-By default it fetches a publish-only token from
-`https://realsimulator.onrender.com/api/livekit/token?role=camera` and publishes
-640×480 video at 15 FPS. Optional settings are `LIVEKIT_TOKEN_ENDPOINT`,
-`CAMERA_WIDTH`, `CAMERA_HEIGHT`, and `CAMERA_FPS`.
-
-Open the deployed controller and press **Connect video** to subscribe. Run
-`client.py` separately when you also want LED control.
