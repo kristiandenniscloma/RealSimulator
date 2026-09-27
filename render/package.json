@@ -4,7 +4,17 @@
   "private": true,
   "description": "WebSocket relay for the Raspberry Pi LED controller",
   "main": "src/server.js",
-  "scripts": { "start": "node src/server.js", "dev": "node --watch src/server.js", "test": "node --test" },
-  "engines": { "node": ">=18" },
-  "dependencies": { "ws": "^8.18.3" }
+  "scripts": {
+    "start": "node src/server.js",
+    "dev": "node --watch src/server.js",
+    "test": "node --test"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "dotenv": "^18.0.4",
+    "livekit-server-sdk": "^2.19.1",
+    "ws": "^8.18.3"
+  }
 }

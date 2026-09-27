@@ -2,12 +2,18 @@ const http = require("node:http");
 const { randomUUID } = require("node:crypto");
 const { createReadStream, stat } = require("node:fs");
 const path = require("node:path");
+require("dotenv").config({ path: path.resolve(__dirname, "../../.env"), quiet: true });
+const { AccessToken } = require("livekit-server-sdk");
 const { WebSocketServer, WebSocket } = require("ws");
 const { initialState, parseMessage, validateSetLed, validateSetAll } = require("./protocol");
 
 const PORT = Number(process.env.PORT || 3000);
 const HOST = process.env.HOST || "0.0.0.0";
 const CONTROLLER_TOKEN = process.env.CONTROLLER_TOKEN || "";
+const LIVEKIT_URL = process.env.LIVEKIT_URL || "";
+const LIVEKIT_API_KEY = process.env.LIVEKIT_API_KEY || "";
+const LIVEKIT_API_SECRET = process.env.LIVEKIT_API_SECRET || "";
+const LIVEKIT_ROOM = process.env.LIVEKIT_ROOM || "rpi-camera";
 let leds = initialState();
 let piOnline = false;
 
@@ -43,10 +49,57 @@ function serveStatic(request, response) {
   return true;
 }
 
-const server = http.createServer((request, response) => {
+async function serveLiveKitToken(request, response) {
+  const requestUrl = new URL(request.url, "http://localhost");
+  if (requestUrl.pathname !== "/api/livekit/token" || request.method !== "GET") return false;
+
+  if (!LIVEKIT_URL || !LIVEKIT_API_KEY || !LIVEKIT_API_SECRET) {
+    response.writeHead(503, { "content-type": "application/json" });
+    response.end(JSON.stringify({ error: "LiveKit is not configured on the server" }));
+    return true;
+  }
+
+  const role = requestUrl.searchParams.get("role");
+  if (!["viewer", "camera"].includes(role)) {
+    response.writeHead(400, { "content-type": "application/json" });
+    response.end(JSON.stringify({ error: "role must be viewer or camera" }));
+    return true;
+  }
+
+  const identity = role === "camera" ? `rpi-camera-${randomUUID()}` : `viewer-${randomUUID()}`;
+  const accessToken = new AccessToken(LIVEKIT_API_KEY, LIVEKIT_API_SECRET, {
+    identity,
+    name: role === "camera" ? "Raspberry Pi Camera" : "Web Viewer",
+    ttl: "1h",
+  });
+  accessToken.addGrant({
+    room: LIVEKIT_ROOM,
+    roomJoin: true,
+    canPublish: role === "camera",
+    canSubscribe: role === "viewer",
+  });
+
+  const token = await accessToken.toJwt();
+  response.writeHead(200, {
+    "content-type": "application/json",
+    "cache-control": "no-store",
+  });
+  response.end(JSON.stringify({ serverUrl: LIVEKIT_URL, participantToken: token, roomName: LIVEKIT_ROOM }));
+  return true;
+}
+
+const server = http.createServer(async (request, response) => {
   if (request.url === "/health") {
     response.writeHead(200, { "content-type": "application/json" });
     response.end(JSON.stringify({ ok: true, piOnline, clients: wss.clients.size }));
+    return;
+  }
+  try {
+    if (await serveLiveKitToken(request, response)) return;
+  } catch (error) {
+    console.error("LiveKit token error:", error.message);
+    response.writeHead(500, { "content-type": "application/json" });
+    response.end(JSON.stringify({ error: "Could not create LiveKit token" }));
     return;
   }
   if (serveStatic(request, response)) return;

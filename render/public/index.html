@@ -13,11 +13,22 @@
     </header>
     <section class="toolbar" aria-label="All LEDs"><button id="all-on" class="primary">Turn all on</button><button id="all-off">Turn all off</button></section>
     <section id="led-grid" class="led-grid" aria-label="LED controls"></section>
+
+    <section class="camera-panel" aria-labelledby="camera-title">
+      <div class="camera-heading">
+        <div><p class="eyebrow">LiveKit WebRTC</p><h2 id="camera-title">Raspberry Pi camera</h2></div>
+        <span id="camera-status" class="badge offline">Video disconnected</span>
+      </div>
+      <div id="video-stage" class="video-stage"><p id="video-placeholder">Start the Pi camera publisher, then connect the viewer.</p></div>
+      <div class="camera-actions"><button id="video-connect" class="primary">Connect video</button><button id="video-disconnect" disabled>Disconnect</button></div>
+    </section>
+
     <details class="settings"><summary>Connection settings</summary>
       <form id="settings-form"><label>WebSocket URL<input id="ws-url" type="url" required></label><label>Controller token<input id="token" type="password" autocomplete="off"></label><button type="submit">Save and reconnect</button></form>
     </details>
     <p id="message" class="message" role="status"></p>
   </main>
+  <script src="https://cdn.jsdelivr.net/npm/livekit-client@2.22.3/dist/livekit-client.umd.min.js"></script>
   <script src="app.js"></script>
 </body>
 </html>

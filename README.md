@@ -6,6 +6,7 @@ cloud-hosted WebSocket server.
 ```text
 render/    -> frontend, web server, WebSocket relay, and shared LED state
 rpi4/      -> Raspberry Pi GPIO client
+webcam/    -> macOS USB-webcam LiveKit publisher
 ```
 
 ## Message flow
@@ -13,6 +14,8 @@ rpi4/      -> Raspberry Pi GPIO client
 The browser sends an LED command to the backend. The backend validates it,
 updates the authoritative state, and broadcasts that state to every browser and
 connected Pi. The Pi applies it to its GPIO pins and sends an acknowledgement.
+The Pi or Mac webcam publisher sends video through a LiveKit WebRTC room; the
+browser obtains a subscribe-only token from the same backend.
 
 ## Quick local simulation
 
@@ -41,6 +44,13 @@ You need Node.js 18+ and Python 3.10+.
    only when you need to connect the UI to another backend.
 
 See each folder's README for deployment, wiring, and configuration details.
+
+## LiveKit video
+
+The local `.env` must contain `LIVEKIT_URL`, `LIVEKIT_API_KEY`, and
+`LIVEKIT_API_SECRET`. Add the same variables to the Render service's Environment
+page before deploying. For a USB webcam on an M1 Mac, follow `webcam/README.md`,
+run `python camera.py`, open the controller, and press **Connect video**.
 
 ## Security note
 
