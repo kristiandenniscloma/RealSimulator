@@ -1,43 +1,64 @@
-# macOS USB webcam publisher
+# Windows USB-webcam publisher
 
-This publisher captures a USB webcam with OpenCV and sends it to the
-`rpi-camera` LiveKit room through WebRTC.
+This program captures a USB webcam on the Windows laptop with OpenCV and
+publishes it to the `rpi-camera` LiveKit room. The video travels through
+LiveKit; the Render server only creates its short-lived publishing token.
 
-## Local use
+## Install on Windows
 
-Start the Node server first, then run:
+Open PowerShell in the project folder:
 
-```bash
+```powershell
 cd webcam
-python3 -m venv .venv
-source .venv/bin/activate
+py -m venv .venv
+.\.venv\Scripts\Activate.ps1
+python -m pip install --upgrade pip
 python -m pip install -r requirements.txt
+```
+
+If PowerShell blocks activation, run this once in that terminal and activate
+again:
+
+```powershell
+Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
+```
+
+## Publish the webcam
+
+```powershell
 python camera.py
 ```
 
-Open <http://localhost:3000> and press **Connect video**. On the first run,
-macOS should request camera permission for Terminal. If it does not, enable it
-under **System Settings → Privacy & Security → Camera**.
+The default token endpoint is the deployed application:
 
-The default camera is index `0`, which might be the built-in camera. To select
-the USB webcam, try:
-
-```bash
-CAMERA_INDEX=1 python camera.py
+```text
+https://realsimulator.onrender.com/api/livekit/token?role=camera
 ```
+
+Camera `0` is used by default. If that selects the built-in camera or fails,
+try the USB camera at index `1` or `2`:
+
+```powershell
+$env:CAMERA_INDEX="1"
+python camera.py
+```
+
+Windows might ask for permission. Camera access must be enabled under
+**Settings → Privacy & security → Camera**, including access for desktop apps.
 
 Configuration:
 
 | Variable | Default | Purpose |
 | --- | --- | --- |
-| `LIVEKIT_TOKEN_ENDPOINT` | local server | Token endpoint; use the Render URL for cloud operation |
+| `LIVEKIT_TOKEN_ENDPOINT` | deployed Render server | Camera token endpoint |
 | `CAMERA_INDEX` | `0` | OpenCV camera number |
 | `CAMERA_WIDTH` | `1280` | Requested capture width |
 | `CAMERA_HEIGHT` | `720` | Requested capture height |
 | `CAMERA_FPS` | `24` | Requested frame rate |
 
-To use the deployed app instead of the local server:
+For a local test where the server runs on the same Windows laptop:
 
-```bash
-LIVEKIT_TOKEN_ENDPOINT="https://realsimulator.onrender.com/api/livekit/token?role=camera" python camera.py
+```powershell
+$env:LIVEKIT_TOKEN_ENDPOINT="http://localhost:3000/api/livekit/token?role=camera"
+python camera.py
 ```

@@ -11,7 +11,7 @@ from livekit import rtc
 
 TOKEN_ENDPOINT = os.getenv(
     "LIVEKIT_TOKEN_ENDPOINT",
-    "http://localhost:3000/api/livekit/token?role=camera",
+    "https://realsimulator.onrender.com/api/livekit/token?role=camera",
 )
 CAMERA_INDEX = int(os.getenv("CAMERA_INDEX", "0"))
 REQUESTED_WIDTH = int(os.getenv("CAMERA_WIDTH", "1280"))
@@ -37,7 +37,7 @@ def open_camera():
     if not camera.isOpened():
         camera.release()
         raise RuntimeError(
-            f"Could not open camera index {CAMERA_INDEX}. Try CAMERA_INDEX=1 or allow Terminal camera access."
+            f"Could not open camera index {CAMERA_INDEX}. Try another CAMERA_INDEX and check camera permissions."
         )
     return camera
 
