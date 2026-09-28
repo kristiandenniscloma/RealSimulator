@@ -10,7 +10,8 @@ Open PowerShell in the repository:
 
 ```powershell
 cd webcam
-py -m http.server 8090
+npm install
+npm start
 ```
 
 Open <http://localhost:8090>, press **Allow camera & scan**, then enable each
