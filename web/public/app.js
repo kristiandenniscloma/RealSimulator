@@ -100,6 +100,7 @@ const videoPlaceholder = document.querySelector("#video-placeholder");
 const videoConnect = document.querySelector("#video-connect");
 const videoDisconnect = document.querySelector("#video-disconnect");
 const videoTracks = new Map();
+const videoCards = new Map();
 let cameraRegistry = new Map();
 let cameraPollTimer;
 
@@ -109,34 +110,53 @@ function setCameraStatus(online, text) {
 
 function renderVideoGrid() {
   const names = new Set([...cameraRegistry.keys(), ...videoTracks.keys()]);
-  videoStage.replaceChildren();
   if (!names.size) {
+    for (const { card } of videoCards.values()) card.remove();
+    videoCards.clear();
     videoPlaceholder.hidden = false;
-    videoStage.appendChild(videoPlaceholder);
     return;
   }
   videoPlaceholder.hidden = true;
   for (const trackName of names) {
     const registry = cameraRegistry.get(trackName);
     const trackInfo = videoTracks.get(trackName);
-    const card = document.createElement("article");
-    card.className = "video-card";
-    const frame = document.createElement("div");
-    frame.className = "video-frame";
-    if (trackInfo) frame.appendChild(trackInfo.element);
-    else frame.textContent = registry?.online ? "Connecting to stream…" : "Camera offline";
-    const meta = document.createElement("div");
-    meta.className = "video-meta";
-    const name = document.createElement("span");
-    name.className = "video-name";
+    let elements = videoCards.get(trackName);
+    if (!elements) {
+      const card = document.createElement("article");
+      card.className = "video-card";
+      const frame = document.createElement("div");
+      frame.className = "video-frame";
+      const meta = document.createElement("div");
+      meta.className = "video-meta";
+      const name = document.createElement("span");
+      name.className = "video-name";
+      const state = document.createElement("span");
+      meta.append(name, state);
+      card.append(frame, meta);
+      videoStage.appendChild(card);
+      elements = { card, frame, name, state };
+      videoCards.set(trackName, elements);
+    }
+
+    const { frame, name, state } = elements;
+    if (trackInfo) {
+      // Keep the LiveKit video mounted across registry refreshes to avoid a
+      // brief pause or black frame when the browser repaints the element.
+      if (trackInfo.element.parentElement !== frame) frame.replaceChildren(trackInfo.element);
+    } else {
+      frame.textContent = registry?.online ? "Connecting to stream…" : "Camera offline";
+    }
     name.textContent = registry?.name || trackName;
-    const state = document.createElement("span");
     const isLive = Boolean(trackInfo);
     state.className = `badge ${isLive ? "online" : "offline"}`;
     state.textContent = isLive ? "Live" : (registry?.enabled ? "Waiting" : "Off");
-    meta.append(name, state);
-    card.append(frame, meta);
-    videoStage.appendChild(card);
+  }
+
+  for (const [trackName, elements] of videoCards) {
+    if (!names.has(trackName)) {
+      elements.card.remove();
+      videoCards.delete(trackName);
+    }
   }
 }
 
