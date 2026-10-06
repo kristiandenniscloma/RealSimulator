@@ -2,7 +2,7 @@
 
 This browser UI discovers the Windows laptop's built-in camera and attached USB
 webcams. Every enabled camera gets a local preview and a separate LiveKit video
-track. Status and labels are registered through the Render server in Supabase.
+track. Status and labels are registered through the Render server in Supabase..
 
 ## Run on Windows
 
