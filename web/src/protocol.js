@@ -1,4 +1,5 @@
-const LED_COUNT = 4;
+const LED_COUNT = 5;
+const OPPOSITE_CONTROLS = { 1: 2, 2: 1, 3: 4, 4: 3 };
 
 function initialState() {
   return Array.from({ length: LED_COUNT }, (_, index) => ({ id: index + 1, on: false }));
@@ -23,7 +24,17 @@ function validateSetLed(message) {
 
 function validateSetAll(message) {
   if (typeof message.on !== "boolean") return { error: "on must be a boolean" };
+  if (message.on) return { error: "set_all only supports OFF for safety" };
   return { on: message.on };
 }
 
-module.exports = { LED_COUNT, initialState, parseMessage, validateSetLed, validateSetAll };
+function applyControlCommand(state, id, on) {
+  const opposite = OPPOSITE_CONTROLS[id];
+  return state.map((control) => {
+    if (control.id === id) return { ...control, on };
+    if (on && control.id === opposite) return { ...control, on: false };
+    return control;
+  });
+}
+
+module.exports = { LED_COUNT, initialState, parseMessage, validateSetLed, validateSetAll, applyControlCommand };

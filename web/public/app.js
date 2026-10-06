@@ -8,11 +8,33 @@ const urlInput = document.querySelector("#ws-url");
 const tokenInput = document.querySelector("#token");
 let socket, reconnectTimer;
 let manualReconnect = false;
-let leds = Array.from({ length: 4 }, (_, index) => ({ id: index + 1, on: false }));
+let leds = Array.from({ length: 5 }, (_, index) => ({ id: index + 1, on: false }));
 let livekitRoom;
+const controlDefinitions = [
+  { id: 1, name: "Forward", icon: "↑", className: "forward" },
+  { id: 2, name: "Backward", icon: "↓", className: "backward" },
+  { id: 3, name: "Left", icon: "←", className: "left" },
+  { id: 4, name: "Right", icon: "→", className: "right" },
+  { id: 5, name: "Scoop", icon: "SCOOP", className: "scoop" },
+];
+const pressedControls = new Set();
 
 function render() {
-  grid.innerHTML = leds.map((led) => `<article class="led-card ${led.on ? "on" : ""}"><div class="bulb" aria-hidden="true"></div><h2>LED ${led.id}</h2><button class="switch" data-id="${led.id}" data-next="${!led.on}" ${socket?.readyState === WebSocket.OPEN ? "" : "disabled"}>Turn ${led.on ? "off" : "on"}</button></article>`).join("");
+  if (!grid.children.length) {
+    grid.innerHTML = controlDefinitions.map((control) => `
+      <button class="control-button ${control.className}" data-id="${control.id}" aria-label="${control.name}" aria-pressed="false">
+        <span class="control-number">${control.id}</span>
+        <span class="control-icon" aria-hidden="true">${control.icon}</span>
+        <span class="control-name">${control.name}</span>
+      </button>`).join("");
+  }
+  for (const control of controlDefinitions) {
+    const button = grid.querySelector(`[data-id="${control.id}"]`);
+    const state = leds.find((item) => item.id === control.id)?.on || false;
+    button.classList.toggle("active", state);
+    button.setAttribute("aria-pressed", String(state));
+    button.disabled = socket?.readyState !== WebSocket.OPEN;
+  }
 }
 function setBadge(element, online, labels) {
   element.classList.toggle("online", online); element.classList.toggle("offline", !online); element.textContent = online ? labels[0] : labels[1];
@@ -35,9 +57,36 @@ function connect() {
   });
   socket.addEventListener("error", () => { messageBox.textContent = "Cannot reach the WebSocket server."; });
 }
-grid.addEventListener("click", (event) => { const button = event.target.closest("button[data-id]"); if (button) send({ type: "set_led", id: Number(button.dataset.id), on: button.dataset.next === "true" }); });
-document.querySelector("#all-on").addEventListener("click", () => send({ type: "set_all", on: true }));
-document.querySelector("#all-off").addEventListener("click", () => send({ type: "set_all", on: false }));
+function setControl(id, on) {
+  if (on) pressedControls.add(id);
+  else pressedControls.delete(id);
+  send({ type: "set_led", id, on });
+}
+function releaseAllControls() {
+  pressedControls.clear();
+  send({ type: "set_all", on: false });
+}
+grid.addEventListener("pointerdown", (event) => {
+  const button = event.target.closest("button[data-id]");
+  if (!button || button.disabled) return;
+  event.preventDefault();
+  button.setPointerCapture(event.pointerId);
+  setControl(Number(button.dataset.id), true);
+});
+for (const eventName of ["pointerup", "pointercancel", "lostpointercapture"]) {
+  grid.addEventListener(eventName, (event) => {
+    const button = event.target.closest("button[data-id]");
+    if (!button) return;
+    const id = Number(button.dataset.id);
+    if (pressedControls.has(id)) setControl(id, false);
+  });
+}
+document.querySelector("#all-off").addEventListener("click", releaseAllControls);
+window.addEventListener("blur", releaseAllControls);
+document.addEventListener("visibilitychange", () => { if (document.hidden) releaseAllControls(); });
+setInterval(() => {
+  for (const id of pressedControls) send({ type: "set_led", id, on: true });
+}, 250);
 document.querySelector("#settings-form").addEventListener("submit", (event) => {
   event.preventDefault(); settings.url = urlInput.value.trim(); settings.token = tokenInput.value;
   localStorage.setItem("wsUrl", settings.url); localStorage.setItem("controllerToken", settings.token);
