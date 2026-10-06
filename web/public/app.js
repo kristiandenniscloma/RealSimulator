@@ -81,7 +81,6 @@ for (const eventName of ["pointerup", "pointercancel", "lostpointercapture"]) {
     if (pressedControls.has(id)) setControl(id, false);
   });
 }
-document.querySelector("#all-off").addEventListener("click", releaseAllControls);
 window.addEventListener("blur", releaseAllControls);
 document.addEventListener("visibilitychange", () => { if (document.hidden) releaseAllControls(); });
 setInterval(() => {

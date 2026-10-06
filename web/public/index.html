@@ -12,25 +12,21 @@
       <div class="statuses"><span id="server-status" class="badge offline">Server offline</span><span id="pi-status" class="badge offline">Pi offline</span></div>
     </header>
 
-    <div class="workspace">
-      <section class="camera-panel panel" aria-labelledby="camera-title">
-        <div class="section-heading">
-          <div><p class="eyebrow">LiveKit WebRTC</p><h2 id="camera-title">Live cameras</h2></div>
-          <span id="camera-status" class="badge offline">Video disconnected</span>
-        </div>
+    <section class="camera-panel panel" aria-labelledby="camera-title">
+      <div class="section-heading">
+        <div><p class="eyebrow">LiveKit WebRTC</p><h2 id="camera-title">Driver view</h2></div>
+        <span id="camera-status" class="badge offline">Video disconnected</span>
+      </div>
+      <div class="game-stage">
         <div id="video-stage" class="video-grid"><p id="video-placeholder" class="empty-state">Start cameras from the Windows camera console, then connect.</p></div>
-        <div class="camera-actions"><button id="video-connect" class="primary">Connect cameras</button><button id="video-disconnect" disabled>Disconnect</button></div>
-      </section>
-
-      <section class="panel controls-panel" aria-labelledby="led-title">
-        <div class="section-heading controls-heading">
-          <div><p class="eyebrow">WebSocket GPIO</p><h2 id="led-title">Drive controls</h2></div>
-          <button id="all-off" class="emergency">Stop all</button>
+        <div class="game-controls-overlay">
+          <section id="led-grid" class="remote-pad" aria-label="RC truck controls"></section>
+          <p class="control-hint">Hold to drive · release to stop</p>
         </div>
-        <section id="led-grid" class="remote-pad" aria-label="RC truck controls"></section>
-        <p class="control-hint">Press and hold to move. Release to stop.</p>
-      </section>
-    </div>
+      </div>
+      <div class="camera-actions"><button id="video-connect" class="primary">Connect cameras</button><button id="video-disconnect" disabled>Disconnect</button></div>
+    </section>
+    <p class="rotate-note">Rotate your phone to landscape for the controller view.</p>
 
     <details class="settings panel"><summary>Connection settings</summary>
       <form id="settings-form"><label>WebSocket URL<input id="ws-url" type="url" required></label><label>Controller token<input id="token" type="password" autocomplete="off"></label><button type="submit">Save and reconnect</button></form>
