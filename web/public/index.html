@@ -1,38 +1,116 @@
 <!doctype html>
 <html lang="en">
 <head>
-  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="theme-color" content="#08101d"><title>Real Simulator</title>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+  <meta name="theme-color" content="#03090d">
+  <title>Real Simulator Control</title>
   <link rel="stylesheet" href="styles.css">
 </head>
 <body>
-  <main class="shell">
-    <header class="topbar">
-      <div><p class="eyebrow">RC truck control</p><h1>Truck Remote</h1><p class="subtitle">Live camera view and momentary drive controls</p></div>
-      <div class="statuses"><span id="server-status" class="badge offline">Server offline</span><span id="pi-status" class="badge offline">Pi offline</span></div>
-    </header>
-
-    <section class="camera-panel panel" aria-labelledby="camera-title">
-      <div class="section-heading">
-        <div><p class="eyebrow">LiveKit WebRTC</p><h2 id="camera-title">Driver view</h2></div>
-        <span id="camera-status" class="badge offline">Video disconnected</span>
+  <div id="start-overlay" class="start-overlay">
+    <div class="start-frame" aria-hidden="true"></div>
+    <div class="start-content">
+      <div class="start-mark" aria-hidden="true">
+        <svg viewBox="0 0 64 64"><path d="M12 45V29l8-12h24l8 12v16l-8 8H20z"/><path d="M22 40V28h20v12M18 47h28"/></svg>
       </div>
-      <div class="game-stage">
-        <div id="video-stage" class="video-grid"><p id="video-placeholder" class="empty-state">Start cameras from the Windows camera console, then connect.</p></div>
-        <div class="game-controls-overlay">
-          <section id="led-grid" class="remote-pad" aria-label="RC truck controls"></section>
-          <p class="control-hint">Hold to drive · release to stop</p>
+      <p class="start-kicker">Remote operations system</p>
+      <h1>Real Simulator</h1>
+      <p class="start-copy">Live machine control is ready. For the best experience, rotate your device to landscape.</p>
+      <button id="start-btn" class="start-button" type="button">
+        <span>Tap to Start Control</span>
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg>
+      </button>
+      <p class="fullscreen-note">Opens the controller in fullscreen</p>
+    </div>
+  </div>
+
+  <main class="cockpit" aria-label="RC truck remote control">
+    <section class="viewfinder" aria-labelledby="view-title">
+      <h2 id="view-title" class="sr-only">Live driver camera</h2>
+
+      <div id="video-stage" class="video-stage">
+        <div id="video-placeholder" class="empty-state">
+          <div class="scanner" aria-hidden="true"><span></span></div>
+          <strong>Awaiting live feed</strong>
+          <span>Start the camera console, then connect the feed.</span>
         </div>
       </div>
-      <div class="camera-actions"><button id="video-connect" class="primary">Connect cameras</button><button id="video-disconnect" disabled>Disconnect</button></div>
-    </section>
-    <p class="rotate-note">Rotate your phone to landscape for the controller view.</p>
 
-    <details class="settings panel"><summary>Connection settings</summary>
-      <form id="settings-form"><label>WebSocket URL<input id="ws-url" type="url" required></label><label>Controller token<input id="token" type="password" autocomplete="off"></label><button type="submit">Save and reconnect</button></form>
-    </details>
-    <p id="message" class="message" role="status"></p>
+      <div class="image-grade" aria-hidden="true"></div>
+      <div class="hud-frame" aria-hidden="true">
+        <i class="corner top-left"></i><i class="corner top-right"></i>
+        <i class="corner bottom-left"></i><i class="corner bottom-right"></i>
+        <i class="side-line left"></i><i class="side-line right"></i>
+      </div>
+
+      <header class="hud-top">
+        <div class="hud-module live-module">
+          <div class="module-title"><span class="record-dot"></span>Live feed</div>
+          <span id="camera-status" class="module-substatus offline">Video disconnected</span>
+        </div>
+
+        <div class="link-console" aria-label="Fuel level">
+          <svg class="gauge-art" viewBox="0 0 320 108" aria-hidden="true">
+            <path class="gauge-track" d="M49 81C68 26 119 12 160 12s92 14 111 69"/>
+            <path class="gauge-low" d="M49 81C58 55 76 37 98 26"/>
+            <path class="gauge-high" d="M102 24c18-8 38-12 58-12 41 0 92 14 111 69"/>
+            <path class="gauge-needle" d="M160 77 235 25"/>
+            <circle cx="160" cy="77" r="8"/>
+          </svg>
+          <div class="link-copy"><strong>Fuel</strong></div>
+          <div class="fuel-readout" aria-hidden="true">
+            <span>E</span>
+            <svg viewBox="0 0 24 24"><path d="M6 21V4h9v17M5 21h11M8 8h5M15 7h2l2 3v7a2 2 0 0 0 4 0v-5l-2-2"/></svg>
+            <span>F</span>
+          </div>
+        </div>
+
+        <button id="camera-switch" class="camera-switch hud-module" type="button" aria-label="Switch camera" disabled>
+          <svg viewBox="0 0 48 48" aria-hidden="true"><path d="M8 16h23v18H8z"/><path d="m31 21 9-5v18l-9-5z"/><path d="M16 11h10"/><path d="M11 39c8 6 20 5 27-3M10 39l1-7m-1 7 7-1"/></svg>
+          <span id="camera-count">CAM 0/0</span>
+          <small id="camera-name">No camera</small>
+        </button>
+      </header>
+
+      <div class="game-controls-overlay">
+        <section id="led-grid" class="remote-pad" aria-label="Vehicle controls"></section>
+      </div>
+
+      <details class="settings">
+        <summary aria-label="Open controller settings">
+          <span class="console-scale" aria-hidden="true"><i></i><b></b></span>
+          <svg class="console-arrow" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>
+        </summary>
+        <div class="settings-panel">
+          <div class="settings-heading">
+            <div><span>System setup</span><h3>Controller settings</h3></div>
+            <span class="panel-code">SYS-05</span>
+          </div>
+          <div class="connection-pills">
+            <span id="server-status" class="status-pill offline">Connecting…</span>
+            <span id="pi-status" class="status-pill offline">Pi offline</span>
+          </div>
+          <div class="camera-actions">
+            <button id="video-connect" class="primary" type="button">Connect live feed</button>
+            <button id="video-disconnect" type="button" disabled>Disconnect</button>
+          </div>
+          <form id="settings-form">
+            <label>WebSocket URL<input id="ws-url" type="url" required></label>
+            <label>Controller token<input id="token" type="password" autocomplete="off"></label>
+            <button type="submit">Save &amp; reconnect</button>
+          </form>
+          <p id="message" class="message" role="status"></p>
+        </div>
+      </details>
+
+      <div class="rotate-prompt" aria-hidden="true">
+        <svg viewBox="0 0 24 24"><rect x="7" y="3" width="10" height="18" rx="2"/><path d="M4 8a9 9 0 0 1 4-5M4 8V4m0 4h4"/></svg>
+        <span>Rotate to landscape</span>
+      </div>
+    </section>
   </main>
+
   <script src="https://cdn.jsdelivr.net/npm/livekit-client@2.22.3/dist/livekit-client.umd.min.js"></script>
   <script src="app.js"></script>
 </body>
