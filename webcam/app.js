@@ -100,7 +100,7 @@ async function enableCamera(device) {
   await connectRoom();
   const track = await LivekitClient.createLocalVideoTrack({
     deviceId: device.deviceId,
-    resolution: { width: 1280, height: 720, frameRate: 30 },
+    resolution: { width: 1280, height: 720, frameRate: 24 },
   });
   const element = track.attach();
   element.autoplay = true;
@@ -109,10 +109,13 @@ async function enableCamera(device) {
   await room.localParticipant.publishTrack(track, {
     name: trackName(device.deviceId),
     source: LivekitClient.Track.Source.Camera,
-    simulcast: true,
-    // Give the full 720p layer enough bitrate for motion and fine detail. The
-    // SFU can still step down to the lower simulcast layers when necessary.
-    videoEncoding: { maxBitrate: 2_500_000, maxFramerate: 30 },
+    // A single 720p encoding avoids the periodic CPU and bandwidth spikes that
+    // occur when every camera generates several simulcast keyframes.
+    simulcast: false,
+    // Keep the 720p stream clear without creating a large upload queue on
+    // variable connections. WebRTC can still reduce resolution on congestion.
+    videoEncoding: { maxBitrate: 1_800_000, maxFramerate: 24 },
+    degradationPreference: "maintain-framerate",
   });
   publications.set(device.deviceId, { track, element });
   await updateRegistry(device, true);

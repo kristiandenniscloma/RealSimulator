@@ -18,8 +18,9 @@ Open <http://localhost:8090>, press **Allow camera & scan**, then enable each
 camera you want to publish. Camera capture is permitted on `localhost` by modern
 browsers. Keep the PowerShell window and browser tab open while streaming.
 
-Each camera is captured at up to 1280x720, 30 fps and publishes simulcast
-layers with a 2.5 Mbps ceiling for the full-resolution layer. Actual quality
+Each camera is captured and published at up to 1280x720, 24 fps with a 1.8 Mbps
+ceiling. A single encoding is used to reduce periodic CPU and upload spikes when
+multiple cameras are active. Actual quality
 can still be limited by the camera hardware, lighting, the Windows publisher's
 upload speed, CPU load, or LiveKit congestion control.
 
