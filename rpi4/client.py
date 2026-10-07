@@ -7,22 +7,35 @@ from contextlib import suppress
 from websockets.asyncio.client import connect
 
 WS_URL = os.getenv("WS_URL", "wss://realsimulator.onrender.com/ws")
-PINS = [int(value) for value in os.getenv("GPIO_PINS", "17,27,22,23").split(",")]
+PINS = [int(value) for value in os.getenv("GPIO_PINS", "17,27,22,23,24").split(",")]
 MOCK_GPIO = os.getenv("MOCK_GPIO", "").lower() in {"1", "true", "yes"}
-if len(PINS) != 4:
-    raise ValueError("GPIO_PINS must contain exactly four BCM pin numbers")
+RELAY_ACTIVE_LOW = os.getenv("RELAY_ACTIVE_LOW", "true").lower() in {"1", "true", "yes"}
+if len(PINS) != 5:
+    raise ValueError("GPIO_PINS must contain exactly five BCM pin numbers")
 
 
-class LedBoard:
-    def __init__(self, pins, mock=False):
+class RelayBoard:
+    def __init__(self, pins, mock=False, active_low=True):
         self.mock = mock
         self.states = [False] * len(pins)
         if mock:
             self.outputs = []
             logging.info("Using mock GPIO on BCM pins %s", pins)
         else:
-            from gpiozero import LED
-            self.outputs = [LED(pin, initial_value=False) for pin in pins]
+            from gpiozero import OutputDevice
+            self.outputs = [
+                OutputDevice(
+                    pin,
+                    active_high=not active_low,
+                    initial_value=False,
+                )
+                for pin in pins
+            ]
+            logging.info(
+                "Using %s relay outputs on BCM pins %s",
+                "active-low" if active_low else "active-high",
+                pins,
+            )
 
     def apply(self, leds):
         by_id = {int(led["id"]): bool(led["on"]) for led in leds}
@@ -31,7 +44,7 @@ class LedBoard:
             self.states[index] = state
             if not self.mock:
                 self.outputs[index].value = state
-        logging.info("LED state: %s", ["ON" if state else "OFF" for state in self.states])
+        logging.info("Relay state: %s", ["ON" if state else "OFF" for state in self.states])
 
     def close(self):
         for output in self.outputs:
@@ -63,7 +76,7 @@ async def run(board):
 
 
 async def main():
-    board = LedBoard(PINS, MOCK_GPIO)
+    board = RelayBoard(PINS, MOCK_GPIO, RELAY_ACTIVE_LOW)
     try:
         await run(board)
     finally:

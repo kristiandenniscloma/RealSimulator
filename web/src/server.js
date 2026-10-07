@@ -6,7 +6,7 @@ require("dotenv").config({ path: path.resolve(__dirname, "../../.env"), quiet: t
 const { AccessToken } = require("livekit-server-sdk");
 const { createClient } = require("@supabase/supabase-js");
 const { WebSocketServer, WebSocket } = require("ws");
-const { initialState, parseMessage, validateSetLed, validateSetAll } = require("./protocol");
+const { initialState, parseMessage, validateSetLed, validateSetAll, applyControlCommand } = require("./protocol");
 
 const PORT = Number(process.env.PORT || 3000);
 const HOST = process.env.HOST || "0.0.0.0";
@@ -22,6 +22,7 @@ const supabase = SUPABASE_URL && SUPABASE_SECRET_KEY
   : null;
 let leds = initialState();
 let piOnline = false;
+let lastControlRefresh = 0;
 
 const FRONTEND_DIR = path.resolve(__dirname, "../public");
 const STATIC_FILES = {
@@ -239,12 +240,14 @@ wss.on("connection", (socket) => {
     if (socket.role === "controller" && message.type === "set_led") {
       const value = validateSetLed(message);
       if (value.error) return send(socket, { type: "error", message: value.error });
-      leds = leds.map((led) => led.id === value.id ? { ...led, on: value.on } : led);
+      lastControlRefresh = Date.now();
+      leds = applyControlCommand(leds, value.id, value.on);
       return broadcastState();
     }
     if (socket.role === "controller" && message.type === "set_all") {
       const value = validateSetAll(message);
       if (value.error) return send(socket, { type: "error", message: value.error });
+      lastControlRefresh = Date.now();
       leds = leds.map((led) => ({ ...led, on: value.on }));
       return broadcastState();
     }
@@ -256,6 +259,10 @@ wss.on("connection", (socket) => {
 
   socket.on("close", () => {
     clearTimeout(authTimer);
+    if (socket.role === "controller" && leds.some((control) => control.on)) {
+      leds = initialState();
+      broadcastState();
+    }
     if (socket.role === "device") {
       piOnline = [...wss.clients].some((client) => client !== socket && client.role === "device");
       broadcastState();
@@ -270,7 +277,16 @@ const heartbeat = setInterval(() => {
     socket.ping();
   }
 }, 30000);
-wss.on("close", () => clearInterval(heartbeat));
+const controlWatchdog = setInterval(() => {
+  if (leds.some((control) => control.on) && Date.now() - lastControlRefresh > 1000) {
+    leds = initialState();
+    broadcastState();
+  }
+}, 250);
+wss.on("close", () => {
+  clearInterval(heartbeat);
+  clearInterval(controlWatchdog);
+});
 server.listen(PORT, HOST, () => {
   console.log(`Controller: http://localhost:${PORT}`);
   console.log(`WebSocket: ws://localhost:${PORT}/ws`);
