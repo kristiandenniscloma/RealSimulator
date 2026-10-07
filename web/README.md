@@ -1,4 +1,4 @@
-# Web application
+# Web application .
 
 This is the complete deployable web application. It serves the files in
 `public/`, keeps the current four-LED state, and relays it between controller
