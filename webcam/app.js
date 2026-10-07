@@ -100,7 +100,7 @@ async function enableCamera(device) {
   await connectRoom();
   const track = await LivekitClient.createLocalVideoTrack({
     deviceId: device.deviceId,
-    resolution: { width: 1280, height: 720, frameRate: 24 },
+    resolution: { width: 1280, height: 720, frameRate: 30 },
   });
   const element = track.attach();
   element.autoplay = true;
@@ -110,6 +110,9 @@ async function enableCamera(device) {
     name: trackName(device.deviceId),
     source: LivekitClient.Track.Source.Camera,
     simulcast: true,
+    // Give the full 720p layer enough bitrate for motion and fine detail. The
+    // SFU can still step down to the lower simulcast layers when necessary.
+    videoEncoding: { maxBitrate: 2_500_000, maxFramerate: 30 },
   });
   publications.set(device.deviceId, { track, element });
   await updateRegistry(device, true);

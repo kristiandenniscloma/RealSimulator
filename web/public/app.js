@@ -125,6 +125,10 @@ async function loadCameraRegistry() {
 
 function attachVideo(track, publication) {
   if (track.kind !== LivekitClient.Track.Kind.Video) return;
+  // This is a monitoring view, so prefer the publisher's full-resolution
+  // simulcast layer. LiveKit may still reduce quality if the connection cannot
+  // sustain it.
+  publication.setVideoQuality(LivekitClient.VideoQuality.HIGH);
   const name = publication.trackName || track.name || publication.trackSid;
   const video = track.attach();
   video.autoplay = true;
@@ -151,7 +155,10 @@ async function connectVideo() {
     const credentials = await response.json();
     if (!response.ok) throw new Error(credentials.error || "Could not create a LiveKit token");
 
-    livekitRoom = new LivekitClient.Room({ adaptiveStream: true });
+    // Adaptive stream chooses a layer from the rendered element size. Camera
+    // cards are intentionally compact, which otherwise keeps them on a blurry
+    // low-resolution layer even when bandwidth is plentiful.
+    livekitRoom = new LivekitClient.Room({ adaptiveStream: false });
     livekitRoom
       .on(LivekitClient.RoomEvent.TrackSubscribed, attachVideo)
       .on(LivekitClient.RoomEvent.TrackUnsubscribed, detachVideo)
