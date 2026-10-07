@@ -125,10 +125,6 @@ async function loadCameraRegistry() {
 
 function attachVideo(track, publication) {
   if (track.kind !== LivekitClient.Track.Kind.Video) return;
-  // This is a monitoring view, so prefer the publisher's full-resolution
-  // simulcast layer. LiveKit may still reduce quality if the connection cannot
-  // sustain it.
-  publication.setVideoQuality(LivekitClient.VideoQuality.HIGH);
   const name = publication.trackName || track.name || publication.trackSid;
   const video = track.attach();
   video.autoplay = true;
