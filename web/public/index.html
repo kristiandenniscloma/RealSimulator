@@ -117,10 +117,20 @@
     sdk.src = useAgora
       ? "https://download.agora.io/sdk/release/AgoraRTC_N-4.24.8.js"
       : "https://cdn.jsdelivr.net/npm/livekit-client@2.22.3/dist/livekit-client.umd.min.js";
-    sdk.onload = () => {
+    const loadApp = () => {
       const app = document.createElement("script");
       app.src = "/app.js";
       document.body.appendChild(app);
+    };
+    sdk.onload = () => {
+      if (!useAgora) return loadApp();
+      const clarity = document.createElement("script");
+      clarity.src = "/vendor/agora-super-clarity.js";
+      clarity.onload = loadApp;
+      // Enhancement is optional; Agora playback must still work when an older
+      // phone cannot load or execute the processor.
+      clarity.onerror = loadApp;
+      document.body.appendChild(clarity);
     };
     sdk.onerror = () => {
       document.querySelector("#camera-status").textContent = `${useAgora ? "Agora" : "LiveKit"} SDK failed to load`;

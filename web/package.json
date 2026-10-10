@@ -14,6 +14,7 @@
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.117.2",
+    "agora-extension-super-clarity": "^2.0.1",
     "agora-token": "^2.0.6",
     "dotenv": "^18.0.4",
     "livekit-server-sdk": "^2.19.1",

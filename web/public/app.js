@@ -116,10 +116,20 @@ let cameraPollTimer;
 let activeCameraName;
 let agoraSubscribedName;
 let agoraSwitchGeneration = 0;
+let agoraClarityExtension;
 const PREFERRED_VIDEO_DIMENSIONS = { width: 1280, height: 720 };
 
 document.title = `${videoTransport === "agora" ? "Agora" : "LiveKit"} · Real Simulator Control`;
 videoConnect.textContent = `Connect ${videoTransport === "agora" ? "Agora" : "LiveKit"} feed`;
+
+if (videoTransport === "agora" && window.SuperClarityExtension && window.AgoraRTC) {
+  try {
+    agoraClarityExtension = new window.SuperClarityExtension();
+    AgoraRTC.registerExtensions([agoraClarityExtension]);
+  } catch (error) {
+    console.warn("Agora Super Clarity is unavailable:", error);
+  }
+}
 
 function setCameraStatus(online, text) {
   setBadge(cameraStatus, online, [text, text]);
@@ -297,22 +307,62 @@ async function connectLiveKitVideo() {
   }
 }
 
-function attachAgoraVideo(user) {
+async function attachAgoraVideo(user) {
   const name = String(user.uid);
   if (!user.videoTrack) return;
   const element = document.createElement("div");
   element.className = "agora-video";
+  let clarityProcessor;
+  if (agoraClarityExtension) {
+    try {
+      clarityProcessor = agoraClarityExtension.createProcessor();
+      let overloadedSamples = 0;
+      clarityProcessor.on("error", (error) => {
+        console.warn("Agora Super Clarity processor error:", error);
+        clarityProcessor?.disable().catch(() => {});
+      });
+      clarityProcessor.on("stats", ({ cost, frameRate }) => {
+        const overloaded = cost > 22 || (frameRate > 0 && frameRate < 20);
+        overloadedSamples = overloaded ? overloadedSamples + 1 : Math.max(0, overloadedSamples - 1);
+        if (overloadedSamples >= 3 && clarityProcessor?.enabled) {
+          // Enhancement must never make steering video lag. Fall back to the
+          // original decoded frames when this phone cannot process at speed.
+          clarityProcessor.disable().catch(() => {});
+          setCameraStatus(true, "1 camera live · clarity reduced for latency");
+        }
+      });
+      user.videoTrack.pipe(clarityProcessor).pipe(user.videoTrack.processorDestination);
+      await clarityProcessor.enable();
+    } catch (error) {
+      console.warn("Playing without Agora Super Clarity:", error);
+      try {
+        clarityProcessor?.unpipe();
+        user.videoTrack.unpipe();
+        user.videoTrack.pipe(user.videoTrack.processorDestination);
+        await clarityProcessor?.release();
+      } catch {}
+      clarityProcessor = undefined;
+    }
+  }
   // Preserve the camera's complete 16:9 field of view. Phones with a wider or
   // taller screen get letterboxing instead of a cropped, digitally enlarged feed.
   user.videoTrack.play(element, { fit: "contain", mirror: false });
-  videoTracks.set(name, { track: user.videoTrack, element, user });
+  videoTracks.set(name, { track: user.videoTrack, element, user, clarityProcessor });
   renderVideoGrid();
-  setCameraStatus(true, "1 selected camera live");
+  setCameraStatus(true, clarityProcessor ? "1 camera live · clarity enhanced" : "1 selected camera live");
 }
 
 function detachAgoraVideo(name) {
   const trackInfo = videoTracks.get(String(name));
   if (!trackInfo) return;
+  if (trackInfo.clarityProcessor) {
+    try {
+      trackInfo.clarityProcessor.unpipe();
+      trackInfo.track.unpipe();
+      trackInfo.track.pipe(trackInfo.track.processorDestination);
+      trackInfo.clarityProcessor.release().catch(() => {});
+    } catch {}
+  }
   trackInfo.track.stop();
   trackInfo.element.remove();
   videoTracks.delete(String(name));
@@ -344,7 +394,7 @@ async function switchAgoraCamera(name) {
     await agoraClient.setRemoteVideoStreamType(user.uid, 0).catch(() => {});
   }
   agoraSubscribedName = name;
-  attachAgoraVideo(user);
+  await attachAgoraVideo(user);
 }
 
 async function connectAgoraVideo() {

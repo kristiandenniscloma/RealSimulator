@@ -39,6 +39,7 @@ const STATIC_FILES = {
   "/agora/styles.css": ["styles.css", "text/css; charset=utf-8"],
   "/livekit/app.js": ["app.js", "text/javascript; charset=utf-8"],
   "/agora/app.js": ["app.js", "text/javascript; charset=utf-8"],
+  "/vendor/agora-super-clarity.js": ["../node_modules/agora-extension-super-clarity/index.js", "text/javascript; charset=utf-8"],
 };
 
 function serveStatic(request, response) {
