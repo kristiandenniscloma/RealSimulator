@@ -13,11 +13,11 @@ let devices = [];
 const publications = new Map();
 let heartbeatTimer;
 const AGORA_ENCODER = {
-  width: 960,
-  height: 540,
+  width: 1280,
+  height: 720,
   frameRate: 30,
-  bitrateMin: 700,
-  bitrateMax: 1600,
+  bitrateMin: 600,
+  bitrateMax: 2400,
 };
 
 function serverUrl() { return serverUrlInput.value.trim().replace(/\/$/, ""); }
@@ -123,6 +123,16 @@ async function enableCamera(device) {
       encoderConfig: AGORA_ENCODER,
       optimizationMode: "motion",
     });
+    const nativeTrack = track.getMediaStreamTrack?.();
+    if (nativeTrack) nativeTrack.contentHint = "motion";
+    const capabilities = nativeTrack?.getCapabilities?.() || {};
+    const cameraTuning = {};
+    if (capabilities.focusMode?.includes("continuous")) cameraTuning.focusMode = "continuous";
+    if (capabilities.exposureMode?.includes("continuous")) cameraTuning.exposureMode = "continuous";
+    if (capabilities.whiteBalanceMode?.includes("continuous")) cameraTuning.whiteBalanceMode = "continuous";
+    if (Object.keys(cameraTuning).length) {
+      await nativeTrack.applyConstraints({ advanced: [cameraTuning] }).catch(() => {});
+    }
     await client.publish(track);
   } catch (error) {
     track?.close();
@@ -132,7 +142,7 @@ async function enableCamera(device) {
   const settings = track.getMediaStreamTrack?.().getSettings?.() || {};
   const captureLabel = settings.width && settings.height
     ? `${settings.width}×${settings.height} @ ${settings.frameRate || 30} fps`
-    : "960×540 @ 30 fps";
+    : "1280×720 @ 30 fps";
   publications.set(device.deviceId, { client, track, captureLabel });
   await updateRegistry(device, true);
   clearInterval(heartbeatTimer);

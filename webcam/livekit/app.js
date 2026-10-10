@@ -13,8 +13,11 @@ let room;
 let devices = [];
 const publications = new Map();
 let heartbeatTimer;
-const LOW_LATENCY_CAPTURE = { width: 960, height: 540, frameRate: 24 };
-const LOW_LATENCY_ENCODING = { maxBitrate: 1_000_000, maxFramerate: 24, priority: "high" };
+// 720p preserves small truck edges and terrain texture. The bitrate ceiling is
+// high enough for sand/rocks while WebRTC may still reduce quality before it
+// allows a latency-building upload queue.
+const LOW_LATENCY_CAPTURE = { width: 1280, height: 720, frameRate: 30 };
+const LOW_LATENCY_ENCODING = { maxBitrate: 2_400_000, maxFramerate: 30, priority: "high" };
 
 function serverUrl() { return serverUrlInput.value.trim().replace(/\/$/, ""); }
 function cameraKey(deviceId) {
@@ -106,6 +109,15 @@ async function enableCamera(device) {
   });
   // Favor responsive motion and avoid upload queues on mobile connections.
   if (track.mediaStreamTrack) track.mediaStreamTrack.contentHint = "motion";
+  const nativeTrack = track.mediaStreamTrack;
+  const capabilities = nativeTrack?.getCapabilities?.() || {};
+  const cameraTuning = {};
+  if (capabilities.focusMode?.includes("continuous")) cameraTuning.focusMode = "continuous";
+  if (capabilities.exposureMode?.includes("continuous")) cameraTuning.exposureMode = "continuous";
+  if (capabilities.whiteBalanceMode?.includes("continuous")) cameraTuning.whiteBalanceMode = "continuous";
+  if (Object.keys(cameraTuning).length) {
+    await nativeTrack.applyConstraints({ advanced: [cameraTuning] }).catch(() => {});
+  }
   const element = track.attach();
   element.autoplay = true;
   element.muted = true;
@@ -144,7 +156,7 @@ async function toggleCamera(device, button) {
     else await enableCamera(device);
     const active = publications.get(device.deviceId);
     setMessage(active
-      ? `${device.label || "Camera"} is live at ${active.captureLabel}, low latency at up to 1 Mbps.`
+      ? `${device.label || "Camera"} is live at ${active.captureLabel}, low latency at up to 2.4 Mbps.`
       : `${device.label || "Camera"} was disabled.`);
   } catch (error) {
     setMessage(error.message, true);
