@@ -14,7 +14,7 @@ let devices = [];
 const publications = new Map();
 let heartbeatTimer;
 const HIGH_QUALITY_CAPTURE = { width: 1920, height: 1080, frameRate: 30 };
-const HIGH_QUALITY_ENCODING = { maxBitrate: 4_500_000, maxFramerate: 30, priority: "high" };
+const HIGH_QUALITY_ENCODING = { maxBitrate: 6_000_000, maxFramerate: 30, priority: "high" };
 
 function serverUrl() { return serverUrlInput.value.trim().replace(/\/$/, ""); }
 function cameraKey(deviceId) {
@@ -114,7 +114,9 @@ async function enableCamera(device) {
   await room.localParticipant.publishTrack(track, {
     name: trackName(device.deviceId),
     source: LivekitClient.Track.Source.Camera,
-    simulcast: true,
+    // Publish one full-resolution stream. With a single selected camera this
+    // prevents mobile viewers from receiving a soft low simulcast layer.
+    simulcast: false,
     videoCodec: "h264",
     videoEncoding: HIGH_QUALITY_ENCODING,
     degradationPreference: "maintain-resolution",
@@ -143,7 +145,7 @@ async function toggleCamera(device, button) {
     else await enableCamera(device);
     const active = publications.get(device.deviceId);
     setMessage(active
-      ? `${device.label || "Camera"} is live at ${active.captureLabel}, up to 4.5 Mbps.`
+      ? `${device.label || "Camera"} is live at ${active.captureLabel}, up to 6 Mbps.`
       : `${device.label || "Camera"} was disabled.`);
   } catch (error) {
     setMessage(error.message, true);
