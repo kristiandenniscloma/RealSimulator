@@ -111,6 +111,7 @@ const videoCards = new Map();
 let cameraRegistry = new Map();
 let cameraPollTimer;
 let activeCameraName;
+const PREFERRED_VIDEO_DIMENSIONS = { width: 1920, height: 1080 };
 
 function setCameraStatus(online, text) {
   setBadge(cameraStatus, online, [text, text]);
@@ -131,7 +132,19 @@ function syncActiveCamera(names = availableCameraNames()) {
   if (!activeCameraName || !names.includes(activeCameraName)) activeCameraName = names[0];
   const activeIndex = names.indexOf(activeCameraName);
   for (const [trackName, elements] of videoCards) {
-    elements.card.classList.toggle("active", trackName === activeCameraName);
+    const isActive = trackName === activeCameraName;
+    elements.card.classList.toggle("active", isActive);
+    const publication = videoTracks.get(trackName)?.publication;
+    if (publication) {
+      // Only pull the selected camera across the network. Explicit dimensions
+      // override adaptive-stream sizing, which can otherwise choose a soft,
+      // low-resolution simulcast layer on mobile Safari.
+      publication.setEnabled(isActive);
+      if (isActive) {
+        publication.setVideoDimensions(PREFERRED_VIDEO_DIMENSIONS);
+        publication.setVideoFPS?.(30);
+      }
+    }
   }
   const registry = cameraRegistry.get(activeCameraName);
   cameraCount.textContent = `CAM ${activeIndex + 1}/${names.length}`;
@@ -198,7 +211,11 @@ async function loadCameraRegistry() {
     const response = await fetch("/api/cameras", { cache: "no-store" });
     if (!response.ok) return;
     const { cameras } = await response.json();
-    cameraRegistry = new Map(cameras.map((camera) => [camera.track_name, camera]));
+    cameraRegistry = new Map(
+      cameras
+        .filter((camera) => camera.enabled)
+        .map((camera) => [camera.track_name, camera]),
+    );
     renderVideoGrid();
   } catch {
     // Video can still work if the optional registry is temporarily unavailable.
@@ -212,7 +229,7 @@ function attachVideo(track, publication) {
   video.autoplay = true;
   video.playsInline = true;
   video.muted = true;
-  videoTracks.set(name, { track, element: video });
+  videoTracks.set(name, { track, element: video, publication });
   renderVideoGrid();
   setCameraStatus(true, `${videoTracks.size} camera${videoTracks.size === 1 ? "" : "s"} live`);
 }
@@ -301,5 +318,18 @@ document.querySelector("#start-btn").addEventListener("click", () => {
   document.body.classList.add("control-active");
   connectVideo();
 });
+
+// Keep long presses, repeated taps, and pinch gestures from selecting or
+// scaling cockpit controls. Settings fields retain normal text interaction.
+const cockpit = document.querySelector(".cockpit");
+const isTextField = (target) => target instanceof Element && target.matches("input, textarea, select");
+for (const eventName of ["contextmenu", "dragstart", "selectstart", "dblclick"]) {
+  cockpit.addEventListener(eventName, (event) => {
+    if (!isTextField(event.target)) event.preventDefault();
+  });
+}
+for (const eventName of ["gesturestart", "gesturechange", "gestureend"]) {
+  document.addEventListener(eventName, (event) => event.preventDefault(), { passive: false });
+}
 
 loadCameraRegistry();

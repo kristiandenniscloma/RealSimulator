@@ -12,12 +12,28 @@
 
 * { box-sizing: border-box; }
 html, body { width: 100%; min-height: 100%; }
-body { margin: 0; overflow: hidden; background: #03070a; }
+html { touch-action: none; }
+body {
+  margin: 0;
+  overflow: hidden;
+  background: #03070a;
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+  overscroll-behavior: none;
+}
 button, input { font: inherit; }
-button { -webkit-tap-highlight-color: transparent; }
+button, summary, svg, img {
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+  -webkit-user-drag: none;
+}
+button, summary { touch-action: none; -webkit-tap-highlight-color: transparent; }
+input { touch-action: manipulation; -webkit-user-select: text; user-select: text; -webkit-touch-callout: default; }
 .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
 
-.cockpit, .viewfinder { width: 100vw; height: 100vh; height: 100dvh; }
+.cockpit, .viewfinder { width: 100vw; height: 100vh; height: 100dvh; touch-action: none; }
 .viewfinder { position: relative; overflow: hidden; isolation: isolate; background: radial-gradient(circle at 50% 45%, #173140 0, #071015 46%, #020609 100%); }
 .video-stage { position: absolute; inset: 0; background: #03080b; }
 .video-card { position: absolute; inset: 0; display: none; overflow: hidden; }

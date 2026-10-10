@@ -13,6 +13,8 @@ let room;
 let devices = [];
 const publications = new Map();
 let heartbeatTimer;
+const HIGH_QUALITY_CAPTURE = { width: 1920, height: 1080, frameRate: 30 };
+const HIGH_QUALITY_ENCODING = { maxBitrate: 4_500_000, maxFramerate: 30, priority: "high" };
 
 function serverUrl() { return serverUrlInput.value.trim().replace(/\/$/, ""); }
 function cameraKey(deviceId) {
@@ -84,7 +86,7 @@ function renderCameras() {
     title.textContent = device.label || `Camera ${index + 1}`;
     const state = document.createElement("span");
     state.className = `camera-state ${active ? "live" : ""}`;
-    state.textContent = active ? "Live" : "Off";
+    state.textContent = active ? `Live · ${active.captureLabel}` : "Off";
     const button = document.createElement("button");
     button.textContent = active ? "Disable camera" : "Enable camera";
     button.className = active ? "danger" : "primary";
@@ -100,8 +102,11 @@ async function enableCamera(device) {
   await connectRoom();
   const track = await LivekitClient.createLocalVideoTrack({
     deviceId: device.deviceId,
-    resolution: { width: 1280, height: 720, frameRate: 24 },
+    resolution: HIGH_QUALITY_CAPTURE,
   });
+  // Ask the encoder to preserve image detail when bandwidth fluctuates.
+  // The browser can still fall back to the camera's highest supported mode.
+  if (track.mediaStreamTrack) track.mediaStreamTrack.contentHint = "detail";
   const element = track.attach();
   element.autoplay = true;
   element.muted = true;
@@ -110,8 +115,15 @@ async function enableCamera(device) {
     name: trackName(device.deviceId),
     source: LivekitClient.Track.Source.Camera,
     simulcast: true,
+    videoCodec: "h264",
+    videoEncoding: HIGH_QUALITY_ENCODING,
+    degradationPreference: "maintain-resolution",
   });
-  publications.set(device.deviceId, { track, element });
+  const captureSettings = track.mediaStreamTrack?.getSettings?.() || {};
+  const captureLabel = captureSettings.width && captureSettings.height
+    ? `${captureSettings.width}×${captureSettings.height}`
+    : "HD";
+  publications.set(device.deviceId, { track, element, captureLabel });
   await updateRegistry(device, true);
 }
 
@@ -129,7 +141,10 @@ async function toggleCamera(device, button) {
   try {
     if (publications.has(device.deviceId)) await disableCamera(device);
     else await enableCamera(device);
-    setMessage(`${device.label || "Camera"} ${publications.has(device.deviceId) ? "is live" : "was disabled"}.`);
+    const active = publications.get(device.deviceId);
+    setMessage(active
+      ? `${device.label || "Camera"} is live at ${active.captureLabel}, up to 4.5 Mbps.`
+      : `${device.label || "Camera"} was disabled.`);
   } catch (error) {
     setMessage(error.message, true);
   } finally {
