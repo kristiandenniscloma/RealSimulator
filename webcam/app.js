@@ -14,7 +14,7 @@ let devices = [];
 const publications = new Map();
 let heartbeatTimer;
 const HIGH_QUALITY_CAPTURE = { width: 1920, height: 1080, frameRate: 30 };
-const HIGH_QUALITY_ENCODING = { maxBitrate: 6_000_000, maxFramerate: 30, priority: "high" };
+const BALANCED_ENCODING = { maxBitrate: 3_000_000, maxFramerate: 30, priority: "high" };
 
 function serverUrl() { return serverUrlInput.value.trim().replace(/\/$/, ""); }
 function cameraKey(deviceId) {
@@ -104,9 +104,9 @@ async function enableCamera(device) {
     deviceId: device.deviceId,
     resolution: HIGH_QUALITY_CAPTURE,
   });
-  // Ask the encoder to preserve image detail when bandwidth fluctuates.
-  // The browser can still fall back to the camera's highest supported mode.
-  if (track.mediaStreamTrack) track.mediaStreamTrack.contentHint = "detail";
+  // Favor responsive motion while retaining the 1080p source. WebRTC can
+  // reduce quality when the mobile connection cannot sustain the target.
+  if (track.mediaStreamTrack) track.mediaStreamTrack.contentHint = "motion";
   const element = track.attach();
   element.autoplay = true;
   element.muted = true;
@@ -118,8 +118,8 @@ async function enableCamera(device) {
     // prevents mobile viewers from receiving a soft low simulcast layer.
     simulcast: false,
     videoCodec: "h264",
-    videoEncoding: HIGH_QUALITY_ENCODING,
-    degradationPreference: "maintain-resolution",
+    videoEncoding: BALANCED_ENCODING,
+    degradationPreference: "balanced",
   });
   const captureSettings = track.mediaStreamTrack?.getSettings?.() || {};
   const captureLabel = captureSettings.width && captureSettings.height
@@ -145,7 +145,7 @@ async function toggleCamera(device, button) {
     else await enableCamera(device);
     const active = publications.get(device.deviceId);
     setMessage(active
-      ? `${device.label || "Camera"} is live at ${active.captureLabel}, up to 6 Mbps.`
+      ? `${device.label || "Camera"} is live at ${active.captureLabel}, balanced at up to 3 Mbps.`
       : `${device.label || "Camera"} was disabled.`);
   } catch (error) {
     setMessage(error.message, true);
