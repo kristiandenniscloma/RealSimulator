@@ -302,7 +302,9 @@ function attachAgoraVideo(user) {
   if (!user.videoTrack) return;
   const element = document.createElement("div");
   element.className = "agora-video";
-  user.videoTrack.play(element, { fit: "cover", mirror: false });
+  // Preserve the camera's complete 16:9 field of view. Phones with a wider or
+  // taller screen get letterboxing instead of a cropped, digitally enlarged feed.
+  user.videoTrack.play(element, { fit: "contain", mirror: false });
   videoTracks.set(name, { track: user.videoTrack, element, user });
   renderVideoGrid();
   setCameraStatus(true, "1 selected camera live");
