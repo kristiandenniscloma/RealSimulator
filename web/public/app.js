@@ -111,7 +111,7 @@ const videoCards = new Map();
 let cameraRegistry = new Map();
 let cameraPollTimer;
 let activeCameraName;
-const PREFERRED_VIDEO_DIMENSIONS = { width: 1280, height: 720 };
+const PREFERRED_VIDEO_DIMENSIONS = { width: 960, height: 540 };
 
 function setCameraStatus(online, text) {
   setBadge(cameraStatus, online, [text, text]);
@@ -137,11 +137,11 @@ function syncActiveCamera(names = availableCameraNames()) {
     const publication = videoTracks.get(trackName)?.publication;
     if (publication) {
       // Only pull the selected camera across the network and request the
-      // low-latency 720p stream on mobile displays.
+      // low-latency 540p stream on mobile displays.
       publication.setEnabled(isActive);
       if (isActive) {
         publication.setVideoDimensions(PREFERRED_VIDEO_DIMENSIONS);
-        publication.setVideoFPS?.(30);
+        publication.setVideoFPS?.(24);
       }
     }
   }

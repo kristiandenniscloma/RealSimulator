@@ -13,8 +13,8 @@ let room;
 let devices = [];
 const publications = new Map();
 let heartbeatTimer;
-const LOW_LATENCY_CAPTURE = { width: 1280, height: 720, frameRate: 30 };
-const LOW_LATENCY_ENCODING = { maxBitrate: 1_500_000, maxFramerate: 30, priority: "high" };
+const LOW_LATENCY_CAPTURE = { width: 960, height: 540, frameRate: 24 };
+const LOW_LATENCY_ENCODING = { maxBitrate: 1_000_000, maxFramerate: 24, priority: "high" };
 
 function serverUrl() { return serverUrlInput.value.trim().replace(/\/$/, ""); }
 function cameraKey(deviceId) {
@@ -144,7 +144,7 @@ async function toggleCamera(device, button) {
     else await enableCamera(device);
     const active = publications.get(device.deviceId);
     setMessage(active
-      ? `${device.label || "Camera"} is live at ${active.captureLabel}, low latency at up to 1.5 Mbps.`
+      ? `${device.label || "Camera"} is live at ${active.captureLabel}, low latency at up to 1 Mbps.`
       : `${device.label || "Camera"} was disabled.`);
   } catch (error) {
     setMessage(error.message, true);

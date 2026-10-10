@@ -445,3 +445,21 @@ body.control-active .start-overlay { opacity: 0; visibility: hidden; pointer-eve
   .camera-switch { width: clamp(94px, 28vw, 126px); }
   .settings summary { width: min(72vw, 330px); }
 }
+
+/* Reduce compositing work so older phones can render the video smoothly. */
+@media (max-width: 960px), (max-height: 600px) {
+  .video-frame video {
+    transform: translateZ(0);
+    backface-visibility: hidden;
+  }
+  .image-grade::after { display: none; }
+  .hud-frame,
+  .control-icon,
+  .fuel-readout svg,
+  .gauge-low,
+  .gauge-high,
+  .gauge-needle { filter: none; }
+  .hud-module,
+  .settings summary,
+  .settings-panel { backdrop-filter: none; }
+}
