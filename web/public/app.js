@@ -251,7 +251,10 @@ async function connectVideo() {
     const credentials = await response.json();
     if (!response.ok) throw new Error(credentials.error || "Could not create a LiveKit token");
 
-    livekitRoom = new LivekitClient.Room({ adaptiveStream: true });
+    // Adaptive stream chooses a layer from the rendered element size. Camera
+    // cards are intentionally compact, which otherwise keeps them on a blurry
+    // low-resolution layer even when bandwidth is plentiful.
+    livekitRoom = new LivekitClient.Room({ adaptiveStream: false });
     livekitRoom
       .on(LivekitClient.RoomEvent.TrackSubscribed, attachVideo)
       .on(LivekitClient.RoomEvent.TrackUnsubscribed, detachVideo)

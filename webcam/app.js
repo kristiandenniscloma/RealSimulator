@@ -114,10 +114,20 @@ async function enableCamera(device) {
   await room.localParticipant.publishTrack(track, {
     name: trackName(device.deviceId),
     source: LivekitClient.Track.Source.Camera,
+<<<<<<< HEAD
     simulcast: true,
     videoCodec: "h264",
     videoEncoding: HIGH_QUALITY_ENCODING,
     degradationPreference: "maintain-resolution",
+=======
+    // A single 720p encoding avoids the periodic CPU and bandwidth spikes that
+    // occur when every camera generates several simulcast keyframes.
+    simulcast: false,
+    // Keep the 720p stream clear without creating a large upload queue on
+    // variable connections. WebRTC can still reduce resolution on congestion.
+    videoEncoding: { maxBitrate: 1_800_000, maxFramerate: 24 },
+    degradationPreference: "maintain-framerate",
+>>>>>>> 018ae25acebb95447bb3de2eba13a4d2ac2cc7f9
   });
   const captureSettings = track.mediaStreamTrack?.getSettings?.() || {};
   const captureLabel = captureSettings.width && captureSettings.height
