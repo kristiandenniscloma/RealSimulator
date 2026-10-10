@@ -213,7 +213,7 @@ async function loadCameraRegistry() {
     const { cameras } = await response.json();
     cameraRegistry = new Map(
       cameras
-        .filter((camera) => camera.enabled)
+        .filter((camera) => camera.enabled && camera.online)
         .map((camera) => [camera.track_name, camera]),
     );
     renderVideoGrid();
