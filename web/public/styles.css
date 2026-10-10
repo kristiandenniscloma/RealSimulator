@@ -463,10 +463,10 @@ body.control-active .start-overlay { opacity: 0; visibility: hidden; pointer-eve
   .fuel-readout { left: 20%; right: 20%; bottom: 9%; font-size: clamp(.58rem, 1.1vw, .82rem); }
   .fuel-readout svg { width: clamp(13px, 1.5vw, 19px); }
 
-  .remote-pad { --dpad-size: clamp(142px, 31vh, 190px); }
+  .remote-pad { --dpad-size: clamp(138px, min(25vw, 34vh), 188px); }
   .drive-cluster {
-    left: max(8px, env(safe-area-inset-left));
-    bottom: max(12px, env(safe-area-inset-bottom));
+    left: 0 !important;
+    bottom: clamp(6px, 2vh, 14px);
     border-color: rgba(81,89,94,.5);
     background: radial-gradient(circle, rgba(52,59,62,.62) 0 18%, rgba(20,27,31,.42) 19% 53%, rgba(63,71,75,.5) 54% 60%, rgba(22,29,32,.38) 61% 100%);
     box-shadow: inset 0 0 0 2px rgba(17,22,25,.65), inset 0 0 18px rgba(0,0,0,.45), 0 5px 16px rgba(0,0,0,.32), 0 0 9px rgba(66,211,248,.15);
@@ -479,15 +479,22 @@ body.control-active .start-overlay { opacity: 0; visibility: hidden; pointer-eve
     box-shadow: inset 0 2px rgba(255,255,255,.07), 0 3px 8px rgba(0,0,0,.32);
   }
   .control-button.scoop {
-    right: max(10px, env(safe-area-inset-right));
-    bottom: max(16px, env(safe-area-inset-bottom));
-    width: clamp(106px, 24vh, 148px);
+    right: 0 !important;
+    bottom: clamp(8px, 2.4vh, 18px);
+    width: clamp(104px, min(18vw, 27vh), 146px);
     border-color: rgba(94,102,106,.55);
     background: radial-gradient(circle, rgba(39,48,52,.58) 0 52%, rgba(17,22,25,.44) 53%);
     box-shadow: inset 0 0 0 2px rgba(20,25,28,.58), inset 0 0 0 5px rgba(255,143,21,.5), inset 0 0 12px rgba(255,108,16,.24), 0 5px 15px rgba(0,0,0,.35), 0 0 10px rgba(69,216,255,.2);
   }
   .control-button.scoop::before { inset: -8px; border-color: rgba(78,218,252,.4); }
-  .control-button.scoop .control-icon { width: 48%; height: 48%; margin-top: -13%; stroke-width: 1.9; }
+  .control-button.scoop .control-icon {
+    width: 50%;
+    height: 50%;
+    margin-top: -13%;
+    fill: currentColor;
+    fill-rule: evenodd;
+    stroke: none;
+  }
   .control-button.scoop .control-name { bottom: 15%; font-size: clamp(.55rem, 2vh, .76rem); }
   .control-button.active { opacity: 1; }
 }
@@ -495,9 +502,9 @@ body.control-active .start-overlay { opacity: 0; visibility: hidden; pointer-eve
 /* On genuinely wide displays the side gutters grow while control sizes stay
    bounded, leaving most of the uncropped 16:9 video unobstructed. */
 @media (orientation: landscape) and (min-aspect-ratio: 2/1) {
-  .remote-pad { --dpad-size: clamp(148px, 24vh, 168px); }
-  .drive-cluster { left: max(6px, env(safe-area-inset-left)); }
-  .control-button.scoop { right: max(8px, env(safe-area-inset-right)); width: clamp(104px, 19vh, 126px); }
+  .remote-pad { --dpad-size: clamp(138px, min(18vw, 29vh), 164px); }
+  .drive-cluster { left: 0 !important; }
+  .control-button.scoop { right: 0 !important; width: clamp(102px, min(14vw, 22vh), 124px); }
 }
 
 /* Reduce compositing work so older phones can render the video smoothly. */

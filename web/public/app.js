@@ -17,7 +17,7 @@ const controlDefinitions = [
   { id: 2, name: "Backward", path: "M12 4v15m0 0 6.5-7M12 19l-6.5-7", className: "backward" },
   { id: 3, name: "Left", path: "M20 12H5m0 0 7-6.5M5 12l7 6.5", className: "left" },
   { id: 4, name: "Right", path: "M4 12h15m0 0-7-6.5M19 12l-7 6.5", className: "right" },
-  { id: 5, name: "Scoop", path: "M5 3v8.5A8.5 8.5 0 0 0 13.5 20H18l2-6h-8a3 3 0 0 1-3-3V3H5Zm8.5 17v1.5M17 20v1.5", className: "scoop" },
+  { id: 5, name: "Scoop", path: "M9 1a1.55 1.55 0 0 0-1.3 2.4C5.9 5.6 4.5 7.8 4 9.5c-1 3.2.4 6.8 3.2 8.6 2.2 1.4 4.9 1.7 7.6 1.1l6.2-1.4v-2.2l-5.1-1.1-5.6-11.2A1.55 1.55 0 0 0 9 1Zm0 1a.55.55 0 1 1 0 1.1A.55.55 0 0 1 9 2Zm1.6-.8h3.1c.6 0 1 .4 1 1v1l2.9 4 4.3.9v2l-2.6.7 2.5.6v2l-5-1-6.4-9.2c.2-.6.3-1.3.2-2Z", className: "scoop" },
 ];
 const pressedControls = new Set();
 
