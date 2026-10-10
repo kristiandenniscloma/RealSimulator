@@ -13,8 +13,8 @@ let room;
 let devices = [];
 const publications = new Map();
 let heartbeatTimer;
-const HIGH_QUALITY_CAPTURE = { width: 1920, height: 1080, frameRate: 30 };
-const BALANCED_ENCODING = { maxBitrate: 3_000_000, maxFramerate: 30, priority: "high" };
+const LOW_LATENCY_CAPTURE = { width: 1280, height: 720, frameRate: 30 };
+const LOW_LATENCY_ENCODING = { maxBitrate: 1_500_000, maxFramerate: 30, priority: "high" };
 
 function serverUrl() { return serverUrlInput.value.trim().replace(/\/$/, ""); }
 function cameraKey(deviceId) {
@@ -102,10 +102,9 @@ async function enableCamera(device) {
   await connectRoom();
   const track = await LivekitClient.createLocalVideoTrack({
     deviceId: device.deviceId,
-    resolution: HIGH_QUALITY_CAPTURE,
+    resolution: LOW_LATENCY_CAPTURE,
   });
-  // Favor responsive motion while retaining the 1080p source. WebRTC can
-  // reduce quality when the mobile connection cannot sustain the target.
+  // Favor responsive motion and avoid upload queues on mobile connections.
   if (track.mediaStreamTrack) track.mediaStreamTrack.contentHint = "motion";
   const element = track.attach();
   element.autoplay = true;
@@ -118,8 +117,8 @@ async function enableCamera(device) {
     // prevents mobile viewers from receiving a soft low simulcast layer.
     simulcast: false,
     videoCodec: "h264",
-    videoEncoding: BALANCED_ENCODING,
-    degradationPreference: "balanced",
+    videoEncoding: LOW_LATENCY_ENCODING,
+    degradationPreference: "maintain-framerate",
   });
   const captureSettings = track.mediaStreamTrack?.getSettings?.() || {};
   const captureLabel = captureSettings.width && captureSettings.height
@@ -145,7 +144,7 @@ async function toggleCamera(device, button) {
     else await enableCamera(device);
     const active = publications.get(device.deviceId);
     setMessage(active
-      ? `${device.label || "Camera"} is live at ${active.captureLabel}, balanced at up to 3 Mbps.`
+      ? `${device.label || "Camera"} is live at ${active.captureLabel}, low latency at up to 1.5 Mbps.`
       : `${device.label || "Camera"} was disabled.`);
   } catch (error) {
     setMessage(error.message, true);
