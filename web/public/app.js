@@ -344,9 +344,9 @@ async function attachAgoraVideo(user) {
       clarityProcessor = undefined;
     }
   }
-  // Preserve the camera's complete 16:9 field of view. Phones with a wider or
-  // taller screen get letterboxing instead of a cropped, digitally enlarged feed.
-  user.videoTrack.play(element, { fit: "contain", mirror: false });
+  // Fill the phone viewport edge to edge. The controls float above the video,
+  // so wide screens do not reserve black side gutters for the touch zones.
+  user.videoTrack.play(element, { fit: "cover", mirror: false });
   videoTracks.set(name, { track: user.videoTrack, element, user, clarityProcessor });
   renderVideoGrid();
   setCameraStatus(true, clarityProcessor ? "1 camera live · clarity enhanced" : "1 selected camera live");

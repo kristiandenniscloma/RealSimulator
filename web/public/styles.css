@@ -39,10 +39,20 @@ input { touch-action: manipulation; -webkit-user-select: text; user-select: text
 .video-card { position: absolute; inset: 0; display: none; overflow: hidden; }
 .video-card.active { display: block; }
 .video-frame { width: 100%; height: 100%; display: grid; place-items: center; color: #71909b; font-size: clamp(.75rem, 1.5vw, 1rem); font-weight: 800; letter-spacing: .1em; text-transform: uppercase; }
-.video-frame video { width: 100%; height: 100%; object-fit: contain !important; }
+.video-frame video {
+  width: 100%;
+  height: 100%;
+  object-fit: cover !important;
+  object-position: center center;
+}
 .agora-video,
 .agora-video > div,
-.agora-video video { width: 100% !important; height: 100% !important; object-fit: contain !important; }
+.agora-video video {
+  width: 100% !important;
+  height: 100% !important;
+  object-fit: cover !important;
+  object-position: center center !important;
+}
 .video-meta { position: absolute; z-index: 2; left: 50%; bottom: max(4.2rem, 10vh); display: flex; align-items: center; gap: .7rem; max-width: 38vw; padding: .45rem .8rem; transform: translateX(-50%); border: 1px solid rgba(96,220,255,.4); background: rgba(3,12,17,.72); color: #d8f7ff; clip-path: polygon(7% 0, 93% 0, 100% 50%, 93% 100%, 7% 100%, 0 50%); backdrop-filter: blur(8px); }
 .video-name { overflow: hidden; font-size: clamp(.55rem, 1.25vw, .72rem); font-weight: 900; letter-spacing: .13em; text-transform: uppercase; text-overflow: ellipsis; white-space: nowrap; }
 .video-state { flex: none; color: #94a3a8; font-size: .55rem; font-weight: 900; letter-spacing: .12em; text-transform: uppercase; }
@@ -499,8 +509,8 @@ body.control-active .start-overlay { opacity: 0; visibility: hidden; pointer-eve
   .control-button.active { opacity: 1; }
 }
 
-/* On genuinely wide displays the side gutters grow while control sizes stay
-   bounded, leaving most of the uncropped 16:9 video unobstructed. */
+/* On genuinely wide displays the controls remain compact while the full-bleed
+   video continues underneath them all the way to both viewport edges. */
 @media (orientation: landscape) and (min-aspect-ratio: 2/1) {
   .remote-pad { --dpad-size: clamp(138px, min(18vw, 29vh), 164px); }
   .drive-cluster { left: 0 !important; }
@@ -526,8 +536,7 @@ body.control-active .start-overlay { opacity: 0; visibility: hidden; pointer-eve
 }
 
 /* Edge-locked liquid controls. This final override intentionally ignores
-   browser safe-area padding: the controls occupy the otherwise unused outer
-   edges instead of being pushed over the camera image. */
+   browser safe-area padding and floats the controls over the full-bleed feed. */
 .game-controls-overlay,
 .remote-pad {
   position: fixed;
