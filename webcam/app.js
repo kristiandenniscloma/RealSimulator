@@ -114,20 +114,10 @@ async function enableCamera(device) {
   await room.localParticipant.publishTrack(track, {
     name: trackName(device.deviceId),
     source: LivekitClient.Track.Source.Camera,
-<<<<<<< HEAD
     simulcast: true,
     videoCodec: "h264",
     videoEncoding: HIGH_QUALITY_ENCODING,
     degradationPreference: "maintain-resolution",
-=======
-    // A single 720p encoding avoids the periodic CPU and bandwidth spikes that
-    // occur when every camera generates several simulcast keyframes.
-    simulcast: false,
-    // Keep the 720p stream clear without creating a large upload queue on
-    // variable connections. WebRTC can still reduce resolution on congestion.
-    videoEncoding: { maxBitrate: 1_800_000, maxFramerate: 24 },
-    degradationPreference: "maintain-framerate",
->>>>>>> 018ae25acebb95447bb3de2eba13a4d2ac2cc7f9
   });
   const captureSettings = track.mediaStreamTrack?.getSettings?.() || {};
   const captureLabel = captureSettings.width && captureSettings.height
@@ -164,16 +154,26 @@ async function toggleCamera(device, button) {
 
 async function scanCameras() {
   scanButton.disabled = true;
+  let permissionStream;
   try {
+    if (!navigator.mediaDevices?.getUserMedia) {
+      throw new Error("Camera access requires Chrome or Edge at http://localhost:8090");
+    }
+    setMessage("Waiting for Windows camera permission…");
     localStorage.setItem("cameraServerUrl", serverUrl());
-    const permissionStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
+    permissionStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
     permissionStream.getTracks().forEach((track) => track.stop());
+    permissionStream = undefined;
     devices = (await navigator.mediaDevices.enumerateDevices()).filter((device) => device.kind === "videoinput");
     renderCameras();
     setMessage(devices.length ? `Found ${devices.length} camera${devices.length === 1 ? "" : "s"}. Enable the ones to publish.` : "No cameras found.", !devices.length);
   } catch (error) {
-    setMessage(`Camera access failed: ${error.message}`, true);
+    const permissionHelp = error.name === "NotAllowedError"
+      ? " Allow camera access in the browser address bar and Windows Settings → Privacy & security → Camera."
+      : "";
+    setMessage(`Camera access failed: ${error.message}.${permissionHelp}`, true);
   } finally {
+    permissionStream?.getTracks().forEach((track) => track.stop());
     scanButton.disabled = false;
   }
 }
