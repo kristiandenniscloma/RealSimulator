@@ -111,7 +111,21 @@
     </section>
   </main>
 
-  <script src="https://cdn.jsdelivr.net/npm/livekit-client@2.22.3/dist/livekit-client.umd.min.js"></script>
-  <script src="app.js"></script>
+  <script>
+    const useAgora = location.pathname.startsWith("/agora");
+    const sdk = document.createElement("script");
+    sdk.src = useAgora
+      ? "https://download.agora.io/sdk/release/AgoraRTC_N-4.24.8.js"
+      : "https://cdn.jsdelivr.net/npm/livekit-client@2.22.3/dist/livekit-client.umd.min.js";
+    sdk.onload = () => {
+      const app = document.createElement("script");
+      app.src = "/app.js";
+      document.body.appendChild(app);
+    };
+    sdk.onerror = () => {
+      document.querySelector("#camera-status").textContent = `${useAgora ? "Agora" : "LiveKit"} SDK failed to load`;
+    };
+    document.body.appendChild(sdk);
+  </script>
 </body>
 </html>

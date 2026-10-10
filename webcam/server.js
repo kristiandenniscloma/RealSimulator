@@ -5,14 +5,23 @@ const path = require("node:path");
 const PORT = Number(process.env.PORT || 8090);
 const HOST = process.env.HOST || "127.0.0.1";
 const FILES = {
-  "/": ["index.html", "text/html; charset=utf-8"],
-  "/index.html": ["index.html", "text/html; charset=utf-8"],
-  "/app.js": ["app.js", "text/javascript; charset=utf-8"],
+  "/livekit/": ["livekit/index.html", "text/html; charset=utf-8"],
+  "/livekit/index.html": ["livekit/index.html", "text/html; charset=utf-8"],
+  "/livekit/app.js": ["livekit/app.js", "text/javascript; charset=utf-8"],
+  "/agora/": ["agora/index.html", "text/html; charset=utf-8"],
+  "/agora/index.html": ["agora/index.html", "text/html; charset=utf-8"],
+  "/agora/app.js": ["agora/app.js", "text/javascript; charset=utf-8"],
   "/styles.css": ["styles.css", "text/css; charset=utf-8"],
 };
 
 const server = http.createServer((request, response) => {
   const pathname = new URL(request.url, "http://localhost").pathname;
+  if (["/", "/livekit", "/agora"].includes(pathname)) {
+    const destination = pathname === "/agora" ? "/agora/" : "/livekit/";
+    response.writeHead(302, { location: destination, "cache-control": "no-store" });
+    response.end();
+    return;
+  }
   const entry = FILES[pathname];
   if (!entry || !["GET", "HEAD"].includes(request.method)) {
     response.writeHead(404, { "content-type": "text/plain; charset=utf-8" });
@@ -39,5 +48,6 @@ const server = http.createServer((request, response) => {
 });
 
 server.listen(PORT, HOST, () => {
-  console.log(`Windows camera console: http://localhost:${PORT}`);
+  console.log(`LiveKit camera console: http://localhost:${PORT}/livekit/`);
+  console.log(`Agora camera console:   http://localhost:${PORT}/agora/`);
 });

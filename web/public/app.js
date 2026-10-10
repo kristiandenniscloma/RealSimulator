@@ -10,6 +10,8 @@ let socket, reconnectTimer;
 let manualReconnect = false;
 let leds = Array.from({ length: 5 }, (_, index) => ({ id: index + 1, on: false }));
 let livekitRoom;
+let agoraClient;
+const videoTransport = location.pathname.startsWith("/agora") ? "agora" : "livekit";
 const controlDefinitions = [
   { id: 1, name: "Forward", path: "M12 20V5m0 0L5.5 12M12 5l6.5 7", className: "forward" },
   { id: 2, name: "Backward", path: "M12 4v15m0 0 6.5-7M12 19l-6.5-7", className: "backward" },
@@ -108,17 +110,24 @@ const cameraCount = document.querySelector("#camera-count");
 const cameraName = document.querySelector("#camera-name");
 const videoTracks = new Map();
 const videoCards = new Map();
+const agoraRemoteUsers = new Map();
 let cameraRegistry = new Map();
 let cameraPollTimer;
 let activeCameraName;
+let agoraSubscribedName;
+let agoraSwitchGeneration = 0;
 const PREFERRED_VIDEO_DIMENSIONS = { width: 960, height: 540 };
+
+document.title = `${videoTransport === "agora" ? "Agora" : "LiveKit"} · Real Simulator Control`;
+videoConnect.textContent = `Connect ${videoTransport === "agora" ? "Agora" : "LiveKit"} feed`;
 
 function setCameraStatus(online, text) {
   setBadge(cameraStatus, online, [text, text]);
 }
 
 function availableCameraNames() {
-  return [...new Set([...videoTracks.keys(), ...cameraRegistry.keys()])];
+  const providerNames = videoTransport === "agora" ? agoraRemoteUsers.keys() : videoTracks.keys();
+  return [...new Set([...providerNames, ...cameraRegistry.keys()])];
 }
 
 function syncActiveCamera(names = availableCameraNames()) {
@@ -135,7 +144,7 @@ function syncActiveCamera(names = availableCameraNames()) {
     const isActive = trackName === activeCameraName;
     elements.card.classList.toggle("active", isActive);
     const publication = videoTracks.get(trackName)?.publication;
-    if (publication) {
+    if (videoTransport === "livekit" && publication) {
       // Only pull the selected camera across the network and request the
       // low-latency 540p stream on mobile displays.
       publication.setEnabled(isActive);
@@ -149,6 +158,9 @@ function syncActiveCamera(names = availableCameraNames()) {
   cameraCount.textContent = `CAM ${activeIndex + 1}/${names.length}`;
   cameraName.textContent = registry?.name || activeCameraName;
   cameraSwitch.disabled = names.length < 2;
+  if (videoTransport === "agora") switchAgoraCamera(activeCameraName).catch((error) => {
+    messageBox.textContent = error.message;
+  });
 }
 
 function renderVideoGrid() {
@@ -183,9 +195,11 @@ function renderVideoGrid() {
     }
 
     const { frame, name, state } = elements;
-    if (trackInfo) {
+    if (trackInfo && videoTransport === "livekit") {
       // Keep the LiveKit video mounted across registry refreshes to avoid a
       // brief pause or black frame when the browser repaints the element.
+      if (trackInfo.element.parentElement !== frame) frame.replaceChildren(trackInfo.element);
+    } else if (trackInfo) {
       if (trackInfo.element.parentElement !== frame) frame.replaceChildren(trackInfo.element);
     } else {
       frame.textContent = registry?.online ? "Connecting to stream…" : "Camera offline";
@@ -207,7 +221,7 @@ function renderVideoGrid() {
 
 async function loadCameraRegistry() {
   try {
-    const response = await fetch("/api/cameras", { cache: "no-store" });
+    const response = await fetch(`/api/cameras?transport=${videoTransport}`, { cache: "no-store" });
     if (!response.ok) return;
     const { cameras } = await response.json();
     cameraRegistry = new Map(
@@ -224,10 +238,15 @@ async function loadCameraRegistry() {
 function attachVideo(track, publication) {
   if (track.kind !== LivekitClient.Track.Kind.Video) return;
   const name = publication.trackName || track.name || publication.trackSid;
+  // This is an interactive control feed, not buffered entertainment video.
+  // Ask supported browsers to keep the receiver playout buffer at its minimum.
+  track.setPlayoutDelay?.(0);
   const video = track.attach();
   video.autoplay = true;
   video.playsInline = true;
   video.muted = true;
+  video.disablePictureInPicture = true;
+  video.disableRemotePlayback = true;
   videoTracks.set(name, { track, element: video, publication });
   renderVideoGrid();
   setCameraStatus(true, `${videoTracks.size} camera${videoTracks.size === 1 ? "" : "s"} live`);
@@ -241,10 +260,8 @@ function detachVideo(track, publication) {
   setCameraStatus(Boolean(videoTracks.size), videoTracks.size ? `${videoTracks.size} cameras live` : "Waiting for cameras");
 }
 
-async function connectVideo() {
-  if (livekitRoom || videoConnect.disabled) return;
-  videoConnect.disabled = true;
-  setCameraStatus(false, "Connecting video…");
+async function connectLiveKitVideo() {
+  if (livekitRoom) return;
   try {
     const response = await fetch("/api/livekit/token?role=viewer", { cache: "no-store" });
     const credentials = await response.json();
@@ -280,11 +297,134 @@ async function connectVideo() {
   }
 }
 
+function attachAgoraVideo(user) {
+  const name = String(user.uid);
+  if (!user.videoTrack) return;
+  const element = document.createElement("div");
+  element.className = "agora-video";
+  user.videoTrack.play(element, { fit: "cover", mirror: false });
+  videoTracks.set(name, { track: user.videoTrack, element, user });
+  renderVideoGrid();
+  setCameraStatus(true, "1 selected camera live");
+}
+
+function detachAgoraVideo(name) {
+  const trackInfo = videoTracks.get(String(name));
+  if (!trackInfo) return;
+  trackInfo.track.stop();
+  trackInfo.element.remove();
+  videoTracks.delete(String(name));
+  renderVideoGrid();
+}
+
+async function switchAgoraCamera(name) {
+  if (!agoraClient || !name || agoraSubscribedName === name) return;
+  const generation = ++agoraSwitchGeneration;
+  const previousName = agoraSubscribedName;
+  // Reserve the target while unsubscribe/subscribe is in flight so HUD
+  // rerenders cannot start a second overlapping Agora operation.
+  agoraSubscribedName = name;
+
+  if (previousName) {
+    const previousUser = agoraRemoteUsers.get(previousName);
+    detachAgoraVideo(previousName);
+    if (previousUser) await agoraClient.unsubscribe(previousUser, "video").catch(() => {});
+  }
+
+  const user = agoraRemoteUsers.get(name);
+  if (!user?.hasVideo || generation !== agoraSwitchGeneration) return;
+  await agoraClient.subscribe(user, "video");
+  if (generation !== agoraSwitchGeneration) {
+    await agoraClient.unsubscribe(user, "video").catch(() => {});
+    return;
+  }
+  if (agoraClient.setRemoteVideoStreamType) {
+    await agoraClient.setRemoteVideoStreamType(user.uid, 0).catch(() => {});
+  }
+  agoraSubscribedName = name;
+  attachAgoraVideo(user);
+}
+
+async function connectAgoraVideo() {
+  try {
+    if (!window.AgoraRTC) throw new Error("Agora RTC SDK did not load");
+    await loadCameraRegistry();
+    const response = await fetch("/api/agora/token?role=viewer", { cache: "no-store" });
+    const credentials = await response.json();
+    if (!response.ok) throw new Error(credentials.error || "Could not create an Agora token");
+
+    agoraClient = AgoraRTC.createClient({ mode: "rtc", codec: "h264" });
+    agoraClient.on("user-published", async (user, mediaType) => {
+      if (mediaType !== "video") return;
+      const name = String(user.uid);
+      agoraRemoteUsers.set(name, user);
+      if (name === activeCameraName) agoraSubscribedName = undefined;
+      renderVideoGrid();
+    });
+    agoraClient.on("user-unpublished", (user, mediaType) => {
+      if (mediaType !== "video") return;
+      const name = String(user.uid);
+      detachAgoraVideo(name);
+      agoraRemoteUsers.delete(name);
+      if (agoraSubscribedName === name) agoraSubscribedName = undefined;
+      renderVideoGrid();
+    });
+    agoraClient.on("user-left", (user) => {
+      const name = String(user.uid);
+      detachAgoraVideo(name);
+      agoraRemoteUsers.delete(name);
+      if (agoraSubscribedName === name) agoraSubscribedName = undefined;
+      renderVideoGrid();
+    });
+    agoraClient.on("connection-state-change", (current) => {
+      if (current === "RECONNECTING") setCameraStatus(false, "Agora reconnecting…");
+      if (current === "DISCONNECTED" && agoraClient) setCameraStatus(false, "Video disconnected");
+    });
+    await agoraClient.join(credentials.appId, credentials.channel, credentials.token, credentials.uid);
+    agoraClient.on("token-privilege-will-expire", async () => {
+      try {
+        const renewal = await fetch(`/api/agora/token?role=viewer&uid=${credentials.uid}`, { cache: "no-store" });
+        const next = await renewal.json();
+        if (!renewal.ok) throw new Error(next.error || "Could not renew Agora token");
+        await agoraClient?.renewToken(next.token);
+      } catch (error) {
+        messageBox.textContent = error.message;
+      }
+    });
+    setCameraStatus(false, "Waiting for cameras");
+    videoDisconnect.disabled = false;
+    clearInterval(cameraPollTimer);
+    cameraPollTimer = setInterval(loadCameraRegistry, 5000);
+  } catch (error) {
+    await agoraClient?.leave().catch(() => {});
+    agoraClient = undefined;
+    setCameraStatus(false, "Agora connection failed");
+    messageBox.textContent = error.message;
+    videoConnect.disabled = false;
+  }
+}
+
+async function connectVideo() {
+  if (livekitRoom || agoraClient || videoConnect.disabled) return;
+  videoConnect.disabled = true;
+  setCameraStatus(false, `Connecting ${videoTransport === "agora" ? "Agora" : "LiveKit"} video…`);
+  if (videoTransport === "agora") await connectAgoraVideo();
+  else await connectLiveKitVideo();
+}
+
 async function disconnectVideo() {
   clearInterval(cameraPollTimer);
+  agoraSwitchGeneration += 1;
+  if (agoraClient) await agoraClient.leave();
+  agoraClient = undefined;
+  agoraSubscribedName = undefined;
+  agoraRemoteUsers.clear();
   if (livekitRoom) await livekitRoom.disconnect();
   livekitRoom = undefined;
-  for (const { track } of videoTracks.values()) track.detach();
+  for (const { track } of videoTracks.values()) {
+    if (videoTransport === "agora") track.stop();
+    else track.detach();
+  }
   videoTracks.clear();
   renderVideoGrid();
   setCameraStatus(false, "Video disconnected");

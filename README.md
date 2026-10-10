@@ -6,7 +6,7 @@ cloud-hosted WebSocket server.
 ```text
 web/       -> Render server and mobile-friendly viewer/controller
 rpi4/      -> Raspberry Pi GPIO client
-webcam/    -> Windows multi-camera publishing console
+webcam/    -> Separate Windows publishers in webcam/livekit and webcam/agora
 supabase/  -> camera registry schema
 ```
 
@@ -15,8 +15,8 @@ supabase/  -> camera registry schema
 The browser sends an LED command to the backend. The backend validates it,
 updates the authoritative state, and broadcasts that state to every browser and
 connected Pi. The Pi applies it to its GPIO pins and sends an acknowledgement.
-The Windows webcam publisher sends video through a LiveKit WebRTC room; the Mac
-browser obtains a subscribe-only token from the same backend.
+The Windows webcam publisher can send video through either LiveKit or Agora RTC.
+The mobile browser uses the matching `/livekit/` or `/agora/` controller route.
 
 ## Quick local simulation
 
@@ -40,7 +40,7 @@ You need Node.js 18+ and Python 3.10+.
    WS_URL=ws://localhost:3000/ws MOCK_GPIO=true python client.py
    ```
 
-3. Open <http://localhost:3000>. The backend serves the frontend and the
+3. Open <http://localhost:3000/livekit/>. The backend serves the frontend and the
    browser automatically connects to its `/ws` endpoint. Use the settings panel
    only when you need to connect the UI to another backend.
 
@@ -53,6 +53,19 @@ The local `.env` must contain `LIVEKIT_URL`, `LIVEKIT_API_KEY`, and
 page before deploying. On Windows, serve `webcam/` locally, scan the available
 cameras, and enable the streams you want. On the Mac, open the deployed
 controller and press **Connect cameras**.
+
+## Agora RTC video
+
+Create an Agora project with an App Certificate, then set `AGORA_APP_ID` and
+`AGORA_APP_CERTIFICATE` in the root `.env` and in Render. `AGORA_CHANNEL`
+defaults to `camera-hub`. Use these matching routes:
+
+- Windows publisher: <http://localhost:8090/agora/>
+- Mobile controller: `https://your-render-host/agora/`
+
+The existing LiveKit routes remain available at `/livekit/`. Agora uses one RTC
+client per enabled webcam so multiple viewers can independently subscribe to
+only one of the two cameras at a time.
 
 ## Supabase camera management
 

@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#07111f">
+  <title>Agora Windows Camera Console</title>
+  <link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+  <main class="shell">
+    <header>
+      <div><p class="eyebrow">Agora RTC publisher</p><h1>Camera console</h1><p class="subtitle">Low-latency Philippines profile: publish each enabled Windows camera as an independent Agora user.</p></div>
+      <span id="room-status" class="status">Disconnected</span>
+    </header>
+
+    <section class="connect-card">
+      <label>Render server URL<input id="server-url" type="url" value="https://realsimulator.onrender.com"></label>
+      <div class="actions"><button id="scan" class="primary">Allow camera &amp; scan</button><button id="disconnect" disabled>Stop all</button></div>
+    </section>
+
+    <p id="message" class="message" role="status">Connect your USB cameras, then scan.</p>
+    <section id="camera-grid" class="camera-grid" aria-label="Available cameras"></section>
+  </main>
+  <script src="https://download.agora.io/sdk/release/AgoraRTC_N-4.24.8.js"></script>
+  <script src="/agora/app.js"></script>
+</body>
+</html>

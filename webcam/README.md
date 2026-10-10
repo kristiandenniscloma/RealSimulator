@@ -1,8 +1,8 @@
 # Windows multi-camera console
 
 This browser UI discovers the Windows laptop's built-in camera and attached USB
-webcams. Every enabled camera gets a local preview and a separate LiveKit video
-track. Status and labels are registered through the Render server in Supabase....
+webcams. LiveKit and Agora are isolated in separate publisher folders and URLs.
+Status and labels are registered through the Render server in Supabase.
 
 ## Run on Windows
 
@@ -14,15 +14,23 @@ npm install
 npm start
 ```
 
-Open <http://localhost:8090>, press **Allow camera & scan**, then enable each
-camera you want to publish. Camera capture is permitted on `localhost` by modern
-browsers. Keep the PowerShell window and browser tab open while streaming.
+Choose one publisher and keep that browser tab open while streaming:
 
-Each camera is captured and published at up to 1280x720, 24 fps with a 1.8 Mbps
-ceiling. A single encoding is used to reduce periodic CPU and upload spikes when
-multiple cameras are active. Actual quality
-can still be limited by the camera hardware, lighting, the Windows publisher's
-upload speed, CPU load, or LiveKit congestion control.
+- LiveKit: <http://localhost:8090/livekit/>
+- Agora RTC: <http://localhost:8090/agora/>
+
+Press **Allow camera & scan**, then enable each camera you want to publish.
+Camera capture is permitted on `localhost` by modern browsers.
+
+The Agora profile uses H.264 at 960×540, up to 30 fps and 1.6 Mbps. Agora's
+`motion` optimization prioritizes smooth delivery and low latency while keeping
+enough bitrate for a sharp 540p control feed. Each enabled camera uses an
+independent Agora client; viewers subscribe only to their selected camera. Agora
+automatically routes through its network, so no fixed US region is configured.
+
+The LiveKit profile remains unchanged at 960×540, 24 fps and up to 1 Mbps.
+Actual quality can still be limited by camera hardware, lighting, Windows upload
+speed, CPU load, packet loss, or the receiving phone's mobile network.
 
 The default Render server is `https://realsimulator.onrender.com`. You can edit
 that URL in the camera console before scanning. Windows camera permission must

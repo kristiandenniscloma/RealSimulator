@@ -1,9 +1,10 @@
 const http = require("node:http");
-const { randomUUID } = require("node:crypto");
+const { randomInt, randomUUID } = require("node:crypto");
 const { createReadStream, stat } = require("node:fs");
 const path = require("node:path");
 require("dotenv").config({ path: path.resolve(__dirname, "../../.env"), quiet: true });
 const { AccessToken } = require("livekit-server-sdk");
+const { RtcTokenBuilder, Role: AgoraRole } = require("agora-token/src/RtcTokenBuilder2");
 const { createClient } = require("@supabase/supabase-js");
 const { WebSocketServer, WebSocket } = require("ws");
 const { initialState, parseMessage, validateSetLed, validateSetAll, applyControlCommand } = require("./protocol");
@@ -15,6 +16,9 @@ const LIVEKIT_URL = process.env.LIVEKIT_URL || "";
 const LIVEKIT_API_KEY = process.env.LIVEKIT_API_KEY || "";
 const LIVEKIT_API_SECRET = process.env.LIVEKIT_API_SECRET || "";
 const LIVEKIT_ROOM = process.env.LIVEKIT_ROOM || "camera-hub";
+const AGORA_APP_ID = process.env.AGORA_APP_ID || "";
+const AGORA_APP_CERTIFICATE = process.env.AGORA_APP_CERTIFICATE || "";
+const AGORA_CHANNEL = process.env.AGORA_CHANNEL || "camera-hub";
 const SUPABASE_URL = process.env.SUPABASE_URL || "";
 const SUPABASE_SECRET_KEY = process.env.SUPABASE_SECRET_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY || "";
 const supabase = SUPABASE_URL && SUPABASE_SECRET_KEY
@@ -26,14 +30,25 @@ let lastControlRefresh = 0;
 
 const FRONTEND_DIR = path.resolve(__dirname, "../public");
 const STATIC_FILES = {
-  "/": ["index.html", "text/html; charset=utf-8"],
+  "/livekit/": ["index.html", "text/html; charset=utf-8"],
+  "/agora/": ["index.html", "text/html; charset=utf-8"],
   "/index.html": ["index.html", "text/html; charset=utf-8"],
   "/styles.css": ["styles.css", "text/css; charset=utf-8"],
   "/app.js": ["app.js", "text/javascript; charset=utf-8"],
+  "/livekit/styles.css": ["styles.css", "text/css; charset=utf-8"],
+  "/agora/styles.css": ["styles.css", "text/css; charset=utf-8"],
+  "/livekit/app.js": ["app.js", "text/javascript; charset=utf-8"],
+  "/agora/app.js": ["app.js", "text/javascript; charset=utf-8"],
 };
 
 function serveStatic(request, response) {
   const pathname = new URL(request.url, "http://localhost").pathname;
+  if (["/", "/livekit", "/agora"].includes(pathname)) {
+    const destination = pathname === "/agora" ? "/agora/" : "/livekit/";
+    response.writeHead(302, { location: destination, "cache-control": "no-store" });
+    response.end();
+    return true;
+  }
   const entry = STATIC_FILES[pathname];
   if (!entry || !["GET", "HEAD"].includes(request.method)) return false;
 
@@ -98,11 +113,20 @@ async function serveCameras(request, response) {
   if (request.method === "GET") {
     const { data, error } = await supabase.from("cameras").select("*").order("name");
     if (error) throw error;
+    const transport = requestUrl.searchParams.get("transport");
     const staleBefore = Date.now() - 20_000;
-    const cameras = data.map((camera) => ({
-      ...camera,
-      online: camera.enabled && new Date(camera.last_seen).getTime() >= staleBefore,
-    }));
+    const cameras = data
+      .filter((camera) => {
+        const isAgora = camera.camera_id.startsWith("agora:");
+        if (transport === "agora") return isAgora;
+        if (transport === "livekit") return !isAgora;
+        return true;
+      })
+      .map((camera) => ({
+        ...camera,
+        transport: camera.camera_id.startsWith("agora:") ? "agora" : "livekit",
+        online: camera.enabled && new Date(camera.last_seen).getTime() >= staleBefore,
+      }));
     response.writeHead(200, apiHeaders());
     response.end(JSON.stringify({ cameras }));
     return true;
@@ -178,6 +202,47 @@ async function serveLiveKitToken(request, response) {
   return true;
 }
 
+async function serveAgoraToken(request, response) {
+  const requestUrl = new URL(request.url, "http://localhost");
+  if (requestUrl.pathname !== "/api/agora/token" || request.method !== "GET") return false;
+
+  if (!AGORA_APP_ID || !AGORA_APP_CERTIFICATE) {
+    response.writeHead(503, apiHeaders());
+    response.end(JSON.stringify({ error: "Agora is not configured on the server" }));
+    return true;
+  }
+
+  const role = requestUrl.searchParams.get("role");
+  if (!["viewer", "camera"].includes(role)) {
+    response.writeHead(400, apiHeaders());
+    response.end(JSON.stringify({ error: "role must be viewer or camera" }));
+    return true;
+  }
+
+  const requestedUid = Number(requestUrl.searchParams.get("uid"));
+  const hasRequestedUid = Number.isInteger(requestedUid) && requestedUid >= 1 && requestedUid <= 0xffffffff;
+  const uid = role === "camera" || hasRequestedUid ? requestedUid : randomInt(1, 0xffffffff);
+  if (!Number.isInteger(uid) || uid < 1 || uid > 0xffffffff) {
+    response.writeHead(400, apiHeaders());
+    response.end(JSON.stringify({ error: "A camera uid between 1 and 4294967295 is required" }));
+    return true;
+  }
+
+  const expiresInSeconds = 3600;
+  const token = RtcTokenBuilder.buildTokenWithUid(
+    AGORA_APP_ID,
+    AGORA_APP_CERTIFICATE,
+    AGORA_CHANNEL,
+    uid,
+    role === "camera" ? AgoraRole.PUBLISHER : AgoraRole.SUBSCRIBER,
+    expiresInSeconds,
+    expiresInSeconds,
+  );
+  response.writeHead(200, apiHeaders());
+  response.end(JSON.stringify({ appId: AGORA_APP_ID, channel: AGORA_CHANNEL, token, uid }));
+  return true;
+}
+
 const server = http.createServer(async (request, response) => {
   if (request.method === "OPTIONS" && request.url.startsWith("/api/")) {
     response.writeHead(204, apiHeaders());
@@ -186,16 +251,24 @@ const server = http.createServer(async (request, response) => {
   }
   if (request.url === "/health") {
     response.writeHead(200, { "content-type": "application/json" });
-    response.end(JSON.stringify({ ok: true, piOnline, clients: wss.clients.size, supabaseConfigured: Boolean(supabase) }));
+    response.end(JSON.stringify({
+      ok: true,
+      piOnline,
+      clients: wss.clients.size,
+      supabaseConfigured: Boolean(supabase),
+      livekitConfigured: Boolean(LIVEKIT_URL && LIVEKIT_API_KEY && LIVEKIT_API_SECRET),
+      agoraConfigured: Boolean(AGORA_APP_ID && AGORA_APP_CERTIFICATE),
+    }));
     return;
   }
   try {
+    if (await serveAgoraToken(request, response)) return;
     if (await serveLiveKitToken(request, response)) return;
     if (await serveCameras(request, response)) return;
   } catch (error) {
-    console.error("LiveKit token error:", error.message);
+    console.error("Video API error:", error.message);
     response.writeHead(500, { "content-type": "application/json" });
-    response.end(JSON.stringify({ error: "Could not create LiveKit token" }));
+    response.end(JSON.stringify({ error: "Could not complete video request" }));
     return;
   }
   if (serveStatic(request, response)) return;
