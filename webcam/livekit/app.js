@@ -107,8 +107,9 @@ async function enableCamera(device) {
     deviceId: device.deviceId,
     resolution: STREAM_CAPTURE,
   });
-  // Favor responsive motion and avoid upload queues on mobile connections.
-  if (track.mediaStreamTrack) track.mediaStreamTrack.contentHint = "motion";
+  // Tell the browser that texture and small-object detail matter more than
+  // preserving every frame during short periods of congestion.
+  if (track.mediaStreamTrack) track.mediaStreamTrack.contentHint = "detail";
   const nativeTrack = track.mediaStreamTrack;
   const capabilities = nativeTrack?.getCapabilities?.() || {};
   const cameraTuning = {};
@@ -130,7 +131,7 @@ async function enableCamera(device) {
     simulcast: false,
     videoCodec: "h264",
     videoEncoding: STREAM_ENCODING,
-    degradationPreference: "maintain-framerate",
+    degradationPreference: "maintain-resolution",
   });
   const captureSettings = track.mediaStreamTrack?.getSettings?.() || {};
   const captureLabel = captureSettings.width && captureSettings.height

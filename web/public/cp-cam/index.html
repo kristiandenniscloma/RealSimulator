@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+  <meta name="theme-color" content="#03080b">
+  <title>Cellphone Camera · Real Simulator</title>
+  <link rel="stylesheet" href="/cp-cam/styles.css">
+</head>
+<body>
+  <main>
+    <div id="preview" class="preview" aria-label="Cellphone camera preview">
+      <div id="empty" class="empty">
+        <span class="lens" aria-hidden="true"></span>
+        <strong>Camera ready</strong>
+        <small>Keep this page open while streaming.</small>
+      </div>
+    </div>
+
+    <header>
+      <div>
+        <p>Agora mobile publisher</p>
+        <h1>Cellphone camera</h1>
+      </div>
+      <span id="live-badge" class="badge">Offline</span>
+    </header>
+
+    <section class="console" aria-label="Camera controls">
+      <label>
+        Camera name
+        <input id="camera-name" maxlength="100" value="Cellphone field camera">
+      </label>
+      <label>
+        Camera lens
+        <select id="camera-select" disabled>
+          <option>Rear camera will be selected</option>
+        </select>
+      </label>
+      <div class="actions">
+        <button id="start" class="primary" type="button">Start 1080p stream</button>
+        <button id="switch" type="button" disabled>Switch camera</button>
+        <button id="stop" class="danger" type="button" disabled>Stop</button>
+      </div>
+      <p id="status" class="status" role="status">Tap Start and allow camera access.</p>
+      <p id="stats" class="stats">1080p · 30 fps · H.264 · detail mode</p>
+    </section>
+  </main>
+
+  <script src="https://download.agora.io/sdk/release/AgoraRTC_N-4.24.8.js"></script>
+  <script src="/cp-cam/app.js"></script>
+</body>
+</html>

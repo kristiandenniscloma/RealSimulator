@@ -32,6 +32,9 @@ const FRONTEND_DIR = path.resolve(__dirname, "../public");
 const STATIC_FILES = {
   "/livekit/": ["index.html", "text/html; charset=utf-8"],
   "/agora/": ["index.html", "text/html; charset=utf-8"],
+  "/cp-cam/": ["cp-cam/index.html", "text/html; charset=utf-8"],
+  "/cp-cam/app.js": ["cp-cam/app.js", "text/javascript; charset=utf-8"],
+  "/cp-cam/styles.css": ["cp-cam/styles.css", "text/css; charset=utf-8"],
   "/index.html": ["index.html", "text/html; charset=utf-8"],
   "/styles.css": ["styles.css", "text/css; charset=utf-8"],
   "/app.js": ["app.js", "text/javascript; charset=utf-8"],
@@ -44,8 +47,10 @@ const STATIC_FILES = {
 
 function serveStatic(request, response) {
   const pathname = new URL(request.url, "http://localhost").pathname;
-  if (["/", "/livekit", "/agora"].includes(pathname)) {
-    const destination = pathname === "/agora" ? "/agora/" : "/livekit/";
+  if (["/", "/livekit", "/agora", "/cp-cam"].includes(pathname)) {
+    const destination = pathname === "/agora"
+      ? "/agora/"
+      : pathname === "/cp-cam" ? "/cp-cam/" : "/livekit/";
     response.writeHead(302, { location: destination, "cache-control": "no-store" });
     response.end();
     return true;

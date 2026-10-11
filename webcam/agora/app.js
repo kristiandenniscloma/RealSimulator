@@ -121,10 +121,12 @@ async function enableCamera(device) {
     track = await AgoraRTC.createCameraVideoTrack({
       cameraId: device.deviceId,
       encoderConfig: AGORA_ENCODER,
-      optimizationMode: "motion",
+      // Preserve the small truck, sand, and terrain texture. Under congestion
+      // Agora may lower frame rate before it softens the 1080p image.
+      optimizationMode: "detail",
     });
     const nativeTrack = track.getMediaStreamTrack?.();
-    if (nativeTrack) nativeTrack.contentHint = "motion";
+    if (nativeTrack) nativeTrack.contentHint = "detail";
     const capabilities = nativeTrack?.getCapabilities?.() || {};
     const cameraTuning = {};
     if (capabilities.focusMode?.includes("continuous")) cameraTuning.focusMode = "continuous";
@@ -171,7 +173,7 @@ async function toggleCamera(device, button) {
     else await enableCamera(device);
     const active = publications.get(device.deviceId);
     setMessage(active
-      ? `${device.label || "Camera"} is live through Agora at ${active.captureLabel}, H.264 at 1.8–2.5 Mbps. Motion mode prioritizes low latency.`
+      ? `${device.label || "Camera"} is live through Agora at ${active.captureLabel}, H.264 at 1.8–2.5 Mbps. Detail mode preserves image sharpness.`
       : `${device.label || "Camera"} was disabled.`);
   } catch (error) {
     setMessage(error.message, true);
