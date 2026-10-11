@@ -22,13 +22,13 @@ Choose one publisher and keep that browser tab open while streaming:
 Press **Allow camera & scan**, then enable each camera you want to publish.
 Camera capture is permitted on `localhost` by modern browsers.
 
-The Agora profile uses H.264 at 1280×720, up to 30 fps and 2.4 Mbps. Agora's
+The Agora profile uses H.264 at 1920×1080, up to 30 fps and 1.8–2.5 Mbps. Agora's
 `motion` optimization prioritizes smooth delivery and low latency while keeping
 enough bitrate for detailed sand, rocks, and small moving trucks. Each enabled camera uses an
 independent Agora client; viewers subscribe only to their selected camera. Agora
 automatically routes through its network, so no fixed US region is configured.
 
-The LiveKit profile uses 1280×720, 30 fps and up to 2.4 Mbps with motion-first
+The LiveKit profile uses H.264 at 1920×1080, 30 fps and up to 2.5 Mbps with motion-first
 congestion behavior.
 Actual quality can still be limited by camera hardware, lighting, Windows upload
 speed, CPU load, packet loss, or the receiving phone's mobile network.

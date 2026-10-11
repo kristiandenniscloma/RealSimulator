@@ -117,7 +117,7 @@ let activeCameraName;
 let agoraSubscribedName;
 let agoraSwitchGeneration = 0;
 let agoraClarityExtension;
-const PREFERRED_VIDEO_DIMENSIONS = { width: 1280, height: 720 };
+const PREFERRED_VIDEO_DIMENSIONS = { width: 1920, height: 1080 };
 
 document.title = `${videoTransport === "agora" ? "Agora" : "LiveKit"} · Real Simulator Control`;
 videoConnect.textContent = `Connect ${videoTransport === "agora" ? "Agora" : "LiveKit"} feed`;
@@ -156,7 +156,7 @@ function syncActiveCamera(names = availableCameraNames()) {
     const publication = videoTracks.get(trackName)?.publication;
     if (videoTransport === "livekit" && publication) {
       // Only pull the selected camera across the network and request the
-      // sharp low-latency 720p stream on mobile displays.
+      // sharp low-latency 1080p stream on mobile displays.
       publication.setEnabled(isActive);
       if (isActive) {
         publication.setVideoDimensions(PREFERRED_VIDEO_DIMENSIONS);

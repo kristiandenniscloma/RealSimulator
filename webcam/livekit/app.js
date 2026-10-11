@@ -13,11 +13,11 @@ let room;
 let devices = [];
 const publications = new Map();
 let heartbeatTimer;
-// 720p preserves small truck edges and terrain texture. The bitrate ceiling is
-// high enough for sand/rocks while WebRTC may still reduce quality before it
-// allows a latency-building upload queue.
-const LOW_LATENCY_CAPTURE = { width: 1280, height: 720, frameRate: 30 };
-const LOW_LATENCY_ENCODING = { maxBitrate: 2_400_000, maxFramerate: 30, priority: "high" };
+// Full-HD profile for small trucks, sand, and terrain detail. WebRTC retains
+// congestion control so a weak connection drops bitrate instead of building a
+// latency-heavy upload queue.
+const STREAM_CAPTURE = { width: 1920, height: 1080, frameRate: 30 };
+const STREAM_ENCODING = { maxBitrate: 2_500_000, maxFramerate: 30, priority: "high" };
 
 function serverUrl() { return serverUrlInput.value.trim().replace(/\/$/, ""); }
 function cameraKey(deviceId) {
@@ -105,7 +105,7 @@ async function enableCamera(device) {
   await connectRoom();
   const track = await LivekitClient.createLocalVideoTrack({
     deviceId: device.deviceId,
-    resolution: LOW_LATENCY_CAPTURE,
+    resolution: STREAM_CAPTURE,
   });
   // Favor responsive motion and avoid upload queues on mobile connections.
   if (track.mediaStreamTrack) track.mediaStreamTrack.contentHint = "motion";
@@ -129,7 +129,7 @@ async function enableCamera(device) {
     // prevents mobile viewers from receiving a soft low simulcast layer.
     simulcast: false,
     videoCodec: "h264",
-    videoEncoding: LOW_LATENCY_ENCODING,
+    videoEncoding: STREAM_ENCODING,
     degradationPreference: "maintain-framerate",
   });
   const captureSettings = track.mediaStreamTrack?.getSettings?.() || {};
@@ -156,7 +156,7 @@ async function toggleCamera(device, button) {
     else await enableCamera(device);
     const active = publications.get(device.deviceId);
     setMessage(active
-      ? `${device.label || "Camera"} is live at ${active.captureLabel}, low latency at up to 2.4 Mbps.`
+      ? `${device.label || "Camera"} is live at ${active.captureLabel}, H.264 at up to 2.5 Mbps.`
       : `${device.label || "Camera"} was disabled.`);
   } catch (error) {
     setMessage(error.message, true);

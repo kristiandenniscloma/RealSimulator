@@ -13,11 +13,11 @@ let devices = [];
 const publications = new Map();
 let heartbeatTimer;
 const AGORA_ENCODER = {
-  width: 1280,
-  height: 720,
+  width: 1920,
+  height: 1080,
   frameRate: 30,
-  bitrateMin: 600,
-  bitrateMax: 2400,
+  bitrateMin: 1800,
+  bitrateMax: 2500,
 };
 
 function serverUrl() { return serverUrlInput.value.trim().replace(/\/$/, ""); }
@@ -142,7 +142,7 @@ async function enableCamera(device) {
   const settings = track.getMediaStreamTrack?.().getSettings?.() || {};
   const captureLabel = settings.width && settings.height
     ? `${settings.width}×${settings.height} @ ${settings.frameRate || 30} fps`
-    : "1280×720 @ 30 fps";
+    : "1920×1080 @ 30 fps";
   publications.set(device.deviceId, { client, track, captureLabel });
   await updateRegistry(device, true);
   clearInterval(heartbeatTimer);
@@ -171,7 +171,7 @@ async function toggleCamera(device, button) {
     else await enableCamera(device);
     const active = publications.get(device.deviceId);
     setMessage(active
-      ? `${device.label || "Camera"} is live through Agora at ${active.captureLabel}. Motion mode prioritizes low latency.`
+      ? `${device.label || "Camera"} is live through Agora at ${active.captureLabel}, H.264 at 1.8–2.5 Mbps. Motion mode prioritizes low latency.`
       : `${device.label || "Camera"} was disabled.`);
   } catch (error) {
     setMessage(error.message, true);
