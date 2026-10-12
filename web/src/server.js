@@ -48,9 +48,9 @@ const STATIC_FILES = {
 function serveStatic(request, response) {
   const pathname = new URL(request.url, "http://localhost").pathname;
   if (["/", "/livekit", "/agora", "/cp-cam"].includes(pathname)) {
-    const destination = pathname === "/agora"
-      ? "/agora/"
-      : pathname === "/cp-cam" ? "/cp-cam/" : "/livekit/";
+    const destination = pathname === "/livekit"
+      ? "/livekit/"
+      : pathname === "/cp-cam" ? "/cp-cam/" : "/agora/";
     response.writeHead(302, { location: destination, "cache-control": "no-store" });
     response.end();
     return true;

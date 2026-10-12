@@ -27,7 +27,7 @@ npm start
 | `SUPABASE_SECRET_KEY` | required for camera management | Server-only Supabase secret key |
 
 Open <http://localhost:3000/livekit/> or <http://localhost:3000/agora/> after
-starting it. `/` redirects to `/livekit/`. Other endpoints are `GET /health`
+starting it. `/` redirects to `/agora/`, while `/livekit/` remains available explicitly. Other endpoints are `GET /health`
 and WebSocket `/ws`. Raspberry Pi devices connect without a token. For
 cloud deployment, optionally set `CONTROLLER_TOKEN` to protect the controls.
 State is kept in memory and resets when the server restarts.

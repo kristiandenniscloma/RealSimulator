@@ -24,6 +24,7 @@ cameraName.value = localStorage.getItem("cpCameraName") || cameraName.value;
 
 let client;
 let track;
+let preparedTrack;
 let cameras = [];
 let signalingSocket;
 let signalingReconnectTimer;
@@ -123,6 +124,19 @@ async function discoverCameras() {
   renderCameraOptions(cameras[0].deviceId);
 }
 
+async function prepareCameraTrack() {
+  preparedTrack = await AgoraRTC.createCameraVideoTrack({
+    cameraId: cameraSelect.value || cameras[0]?.deviceId,
+    encoderConfig: ENCODER,
+    optimizationMode: "detail",
+  });
+  const nativeTrack = preparedTrack.getMediaStreamTrack?.();
+  if (nativeTrack) nativeTrack.contentHint = "detail";
+  // Track creation happens inside the Arm button gesture for mobile Safari.
+  // Disabling it stops capture and publishing until WebSocket demand arrives.
+  await preparedTrack.setEnabled(false);
+}
+
 async function requestWakeLock() {
   try {
     if ("wakeLock" in navigator && !wakeLock) wakeLock = await navigator.wakeLock.request("screen");
@@ -170,13 +184,9 @@ async function startPublishing() {
       await client?.renewToken(renewal.token);
     });
     await client.join(credentials.appId, credentials.channel, credentials.token, credentials.uid);
-    track = await AgoraRTC.createCameraVideoTrack({
-      cameraId: cameraSelect.value || cameras[0]?.deviceId,
-      encoderConfig: ENCODER,
-      optimizationMode: "detail",
-    });
-    const nativeTrack = track.getMediaStreamTrack?.();
-    if (nativeTrack) nativeTrack.contentHint = "detail";
+    if (!preparedTrack) throw new Error("Camera is not prepared. Disarm and arm it again.");
+    track = preparedTrack;
+    await track.setEnabled(true);
     emptyState.hidden = true;
     track.play(preview, { fit: "cover", mirror: false });
     await client.publish(track);
@@ -205,7 +215,7 @@ async function stopPublishing(updateCamera = true) {
   if (updateCamera && (client || track)) await updateRegistry(false).catch(() => {});
   if (client && track) await client.unpublish(track).catch(() => {});
   track?.stop();
-  track?.close();
+  await track?.setEnabled(false).catch(() => {});
   track = undefined;
   await client?.leave().catch(() => {});
   client = undefined;
@@ -264,6 +274,7 @@ async function armCamera() {
     if (!navigator.mediaDevices?.getUserMedia) throw new Error("Camera access requires HTTPS and a supported browser");
     localStorage.setItem("cpCameraName", cameraName.value.trim());
     await discoverCameras();
+    await prepareCameraTrack();
     armed = true;
     await requestWakeLock();
     renderState();
@@ -271,6 +282,8 @@ async function armCamera() {
     setStatus("Armed and waiting for a viewer. Camera capture is off.");
   } catch (error) {
     armed = false;
+    preparedTrack?.close();
+    preparedTrack = undefined;
     setStatus(`Could not arm camera: ${error.message}`, true);
     renderState();
   }
@@ -283,6 +296,8 @@ async function disarmCamera() {
   signalingSocket?.close();
   signalingSocket = undefined;
   await stopPublishing();
+  preparedTrack?.close();
+  preparedTrack = undefined;
   await wakeLock?.release().catch(() => {});
   wakeLock = undefined;
   renderState();
@@ -294,7 +309,8 @@ async function switchCamera(deviceId) {
   switchButton.disabled = true;
   cameraSelect.disabled = true;
   try {
-    if (track) await track.setDevice(deviceId);
+    const cameraTrack = track || preparedTrack;
+    if (cameraTrack) await cameraTrack.setDevice(deviceId);
     cameraSelect.value = deviceId;
     setStatus(track
       ? `Switched to ${cameraSelect.selectedOptions[0]?.textContent || "camera"}.`
@@ -324,7 +340,7 @@ window.addEventListener("pagehide", () => {
   armed = false;
   signalingSocket?.close();
   if (client || track) updateRegistry(false).catch(() => {});
-  track?.close();
+  (track || preparedTrack)?.close();
   client?.leave();
 });
 
