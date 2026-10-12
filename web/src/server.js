@@ -288,6 +288,19 @@ function send(socket, payload) {
 }
 function broadcast(payload) { for (const client of wss.clients) send(client, payload); }
 function broadcastState() { broadcast({ type: "state", leds, piOnline, timestamp: new Date().toISOString() }); }
+function videoViewerCount(transport = "agora") {
+  return [...wss.clients].filter((client) => (
+    client.role === "controller"
+    && client.videoDemandActive
+    && client.videoTransport === transport
+  )).length;
+}
+function broadcastCameraDemand() {
+  const viewers = videoViewerCount("agora");
+  for (const client of wss.clients) {
+    if (client.role === "camera") send(client, { type: "camera_demand", transport: "agora", active: viewers > 0, viewers });
+  }
+}
 function controllerAuthorized(token) {
   return !CONTROLLER_TOKEN || token === CONTROLLER_TOKEN;
 }
@@ -295,6 +308,8 @@ function controllerAuthorized(token) {
 wss.on("connection", (socket) => {
   socket.id = randomUUID();
   socket.role = null;
+  socket.videoDemandActive = false;
+  socket.videoTransport = null;
   socket.isAlive = true;
   socket.on("pong", () => { socket.isAlive = true; });
   const authTimer = setTimeout(() => { if (!socket.role) socket.close(4001, "Authentication timeout"); }, 5000);
@@ -304,7 +319,7 @@ wss.on("connection", (socket) => {
     if (parsed.error) return send(socket, { type: "error", message: parsed.error });
     const message = parsed.message;
     if (!socket.role) {
-      if (message.type !== "auth" || !["controller", "device"].includes(message.role)) return send(socket, { type: "error", message: "Authenticate first" });
+      if (message.type !== "auth" || !["controller", "device", "camera"].includes(message.role)) return send(socket, { type: "error", message: "Authenticate first" });
       if (message.role === "controller" && !controllerAuthorized(message.token || "")) {
         send(socket, { type: "error", message: "Invalid token" });
         return socket.close(4003, "Unauthorized");
@@ -313,9 +328,19 @@ wss.on("connection", (socket) => {
       socket.role = message.role;
       if (socket.role === "device") piOnline = true;
       send(socket, { type: "authenticated", role: socket.role, clientId: socket.id });
+      if (socket.role === "camera") {
+        const viewers = videoViewerCount("agora");
+        send(socket, { type: "camera_demand", transport: "agora", active: viewers > 0, viewers });
+      }
       return broadcastState();
     }
     if (message.type === "get_state") return broadcastState();
+    if (socket.role === "controller" && message.type === "video_viewer" && typeof message.active === "boolean" && ["agora", "livekit"].includes(message.transport)) {
+      socket.videoDemandActive = message.active;
+      socket.videoTransport = message.transport;
+      broadcastCameraDemand();
+      return;
+    }
     if (socket.role === "controller" && message.type === "set_led") {
       const value = validateSetLed(message);
       if (value.error) return send(socket, { type: "error", message: value.error });
@@ -338,6 +363,8 @@ wss.on("connection", (socket) => {
 
   socket.on("close", () => {
     clearTimeout(authTimer);
+    const hadVideoDemand = socket.videoDemandActive;
+    socket.videoDemandActive = false;
     if (socket.role === "controller" && leds.some((control) => control.on)) {
       leds = initialState();
       broadcastState();
@@ -346,6 +373,7 @@ wss.on("connection", (socket) => {
       piOnline = [...wss.clients].some((client) => client !== socket && client.role === "device");
       broadcastState();
     }
+    if (hadVideoDemand) broadcastCameraDemand();
   });
 });
 

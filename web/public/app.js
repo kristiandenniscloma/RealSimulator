@@ -8,6 +8,7 @@ const urlInput = document.querySelector("#ws-url");
 const tokenInput = document.querySelector("#token");
 let socket, reconnectTimer;
 let manualReconnect = false;
+let videoDemandActive = false;
 let leds = Array.from({ length: 5 }, (_, index) => ({ id: index + 1, on: false }));
 let livekitRoom;
 let agoraClient;
@@ -51,7 +52,12 @@ function connect() {
   clearTimeout(reconnectTimer); messageBox.textContent = "";
   setBadge(serverStatus, false, ["Server online", "Connecting…"]);
   socket = new WebSocket(settings.url);
-  socket.addEventListener("open", () => { send({ type: "auth", role: "controller", token: settings.token }); setBadge(serverStatus, true, ["Server online", "Server offline"]); render(); });
+  socket.addEventListener("open", () => {
+    send({ type: "auth", role: "controller", token: settings.token });
+    if (videoDemandActive) send({ type: "video_viewer", active: true, transport: videoTransport });
+    setBadge(serverStatus, true, ["Server online", "Server offline"]);
+    render();
+  });
   socket.addEventListener("message", (event) => {
     const data = JSON.parse(event.data);
     if (data.type === "state") { leds = data.leds; setBadge(piStatus, data.piOnline, ["Pi online", "Pi offline"]); render(); }
@@ -72,6 +78,10 @@ function setControl(id, on) {
 function releaseAllControls() {
   pressedControls.clear();
   send({ type: "set_all", on: false });
+}
+function setVideoDemand(active) {
+  videoDemandActive = active;
+  send({ type: "video_viewer", active, transport: videoTransport });
 }
 grid.addEventListener("pointerdown", (event) => {
   const button = event.target.closest("button[data-id]");
@@ -458,13 +468,16 @@ async function connectAgoraVideo() {
 
 async function connectVideo() {
   if (livekitRoom || agoraClient || videoConnect.disabled) return;
+  setVideoDemand(true);
   videoConnect.disabled = true;
   setCameraStatus(false, `Connecting ${videoTransport === "agora" ? "Agora" : "LiveKit"} video…`);
   if (videoTransport === "agora") await connectAgoraVideo();
   else await connectLiveKitVideo();
+  if (!livekitRoom && !agoraClient) setVideoDemand(false);
 }
 
 async function disconnectVideo() {
+  setVideoDemand(false);
   clearInterval(cameraPollTimer);
   agoraSwitchGeneration += 1;
   if (agoraClient) await agoraClient.leave();
@@ -512,6 +525,7 @@ document.querySelector("#start-btn").addEventListener("click", () => {
   document.body.classList.add("control-active");
   connectVideo();
 });
+window.addEventListener("pagehide", () => setVideoDemand(false));
 
 // Keep long presses, repeated taps, and pinch gestures from selecting or
 // scaling cockpit controls. Settings fields retain normal text interaction.

@@ -46,7 +46,10 @@ Unsupported or overloaded phones automatically fall back to normal playback.
 Open `/cp-cam/` on a cellphone to publish its rear camera through Agora. The
 page requests a 1920×1080, 30 fps, H.264 detail-priority stream, registers it in
 the shared camera list, supports lens switching, and must remain open while it
-is live. Camera access requires HTTPS, which the deployed Render URL provides.
+is armed. After permission is granted once, a WebSocket demand signal starts
+capture only while at least one `/agora/` controller is requesting video. The
+camera stops four seconds after the last viewer leaves. Camera access requires
+HTTPS, which the deployed Render URL provides.
 
 Run `../supabase/camera_management.sql` in the Supabase SQL Editor before using
 the camera console. Camera publishers update `POST /api/cameras`; viewers read

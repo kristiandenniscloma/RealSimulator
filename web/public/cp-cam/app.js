@@ -1,5 +1,7 @@
 const preview = document.querySelector("#preview");
 const emptyState = document.querySelector("#empty");
+const emptyTitle = emptyState.querySelector("strong");
+const emptyCopy = emptyState.querySelector("small");
 const cameraName = document.querySelector("#camera-name");
 const cameraSelect = document.querySelector("#camera-select");
 const startButton = document.querySelector("#start");
@@ -9,13 +11,9 @@ const statusText = document.querySelector("#status");
 const statsText = document.querySelector("#stats");
 const liveBadge = document.querySelector("#live-badge");
 
-const ENCODER = {
-  width: 1920,
-  height: 1080,
-  frameRate: 30,
-  bitrateMin: 1800,
-  bitrateMax: 2500,
-};
+const ENCODER = { width: 1920, height: 1080, frameRate: 30, bitrateMin: 1800, bitrateMax: 2500 };
+const SIGNAL_URL = `${location.protocol === "https:" ? "wss" : "ws"}://${location.host}/ws`;
+const IDLE_GRACE_MS = 4000;
 
 let uid = Number(localStorage.getItem("cpCameraUid"));
 if (!Number.isInteger(uid) || uid < 1 || uid > 0xffffffff) {
@@ -27,22 +25,38 @@ cameraName.value = localStorage.getItem("cpCameraName") || cameraName.value;
 let client;
 let track;
 let cameras = [];
+let signalingSocket;
+let signalingReconnectTimer;
+let idleStopTimer;
 let heartbeatTimer;
 let statsTimer;
 let wakeLock;
+let armed = false;
+let publishing = false;
+let stopping = false;
+let viewerCount = 0;
 
 function setStatus(text, error = false) {
   statusText.textContent = text;
   statusText.classList.toggle("error", error);
 }
 
-function setLive(live) {
-  liveBadge.textContent = live ? "Live" : "Offline";
+function renderState() {
+  const live = Boolean(track && client);
+  liveBadge.textContent = live ? "Live" : armed ? "Armed" : "Offline";
   liveBadge.classList.toggle("live", live);
-  startButton.disabled = live;
-  stopButton.disabled = !live;
-  switchButton.disabled = !live || cameras.length < 2;
-  cameraSelect.disabled = !live || cameras.length < 2;
+  liveBadge.classList.toggle("armed", armed && !live);
+  startButton.disabled = armed;
+  stopButton.disabled = !armed;
+  switchButton.disabled = !armed || cameras.length < 2;
+  cameraSelect.disabled = !armed || cameras.length < 2;
+  cameraName.disabled = armed;
+  if (!live) {
+    emptyTitle.textContent = armed ? "Camera armed" : "Camera ready";
+    emptyCopy.textContent = armed
+      ? `${viewerCount} viewer${viewerCount === 1 ? "" : "s"} · capture is off while idle`
+      : "Arm once, then keep this page open.";
+  }
 }
 
 async function getCredentials() {
@@ -107,12 +121,11 @@ async function discoverCameras() {
   cameras = rearCameraFirst(await AgoraRTC.getCameras(), preferredId);
   if (!cameras.length) throw new Error("No cellphone camera was found");
   renderCameraOptions(cameras[0].deviceId);
-  return cameras[0].deviceId;
 }
 
 async function requestWakeLock() {
   try {
-    if ("wakeLock" in navigator) wakeLock = await navigator.wakeLock.request("screen");
+    if ("wakeLock" in navigator && !wakeLock) wakeLock = await navigator.wakeLock.request("screen");
   } catch {}
 }
 
@@ -126,24 +139,31 @@ function beginStats() {
     const height = stats.sendResolutionHeight || capture.height || 0;
     const fps = stats.sendFrameRate || capture.frameRate || 0;
     const bitrate = stats.sendBitrate || 0;
-    statsText.textContent = `${width || "—"}×${height || "—"} · ${Math.round(fps) || "—"} fps · ${Math.round(bitrate) || "—"} Kbps · H.264 detail`;
+    statsText.textContent = `${width || "—"}×${height || "—"} · ${Math.round(fps) || "—"} fps · ${Math.round(bitrate) || "—"} Kbps · ${viewerCount} viewer${viewerCount === 1 ? "" : "s"}`;
   }, 2000);
 }
 
-async function startStream() {
-  if (client || track) return;
-  startButton.disabled = true;
-  setStatus("Requesting rear-camera access…");
+function scheduleIdleStop() {
+  clearTimeout(idleStopTimer);
+  if (!track && !client) return;
+  idleStopTimer = setTimeout(() => {
+    if (viewerCount > 0) return;
+    if (publishing) return scheduleIdleStop();
+    stopPublishing().catch(() => {});
+  }, IDLE_GRACE_MS);
+}
+
+async function startPublishing() {
+  if (!armed || viewerCount < 1 || client || track || publishing) return;
+  publishing = true;
+  clearTimeout(idleStopTimer);
+  setStatus(`${viewerCount} viewer${viewerCount === 1 ? "" : "s"} requested video. Starting camera…`);
   try {
-    if (!window.AgoraRTC) throw new Error("Agora SDK did not load");
-    if (!navigator.mediaDevices?.getUserMedia) throw new Error("Camera access requires HTTPS and a supported browser");
-    localStorage.setItem("cpCameraName", cameraName.value.trim());
-    const deviceId = await discoverCameras();
     const credentials = await getCredentials();
     client = AgoraRTC.createClient({ mode: "rtc", codec: "h264" });
     client.on("connection-state-change", (current) => {
       if (current === "RECONNECTING") setStatus("Network changed. Reconnecting to Agora…");
-      if (current === "CONNECTED" && track) setStatus("Streaming. Keep this page open and the screen awake.");
+      if (current === "CONNECTED" && track) setStatus(`Live for ${viewerCount} viewer${viewerCount === 1 ? "" : "s"}.`);
     });
     client.on("token-privilege-will-expire", async () => {
       const renewal = await getCredentials();
@@ -151,7 +171,7 @@ async function startStream() {
     });
     await client.join(credentials.appId, credentials.channel, credentials.token, credentials.uid);
     track = await AgoraRTC.createCameraVideoTrack({
-      cameraId: deviceId,
+      cameraId: cameraSelect.value || cameras[0]?.deviceId,
       encoderConfig: ENCODER,
       optimizationMode: "detail",
     });
@@ -163,33 +183,21 @@ async function startStream() {
     await updateRegistry(true);
     heartbeatTimer = setInterval(() => updateRegistry(true).catch(() => {}), 8000);
     beginStats();
-    await requestWakeLock();
-    setLive(true);
-    setStatus("Streaming. Keep this page open and the screen awake.");
+    renderState();
+    setStatus(`Live for ${viewerCount} viewer${viewerCount === 1 ? "" : "s"}. Camera stops automatically when idle.`);
   } catch (error) {
-    await stopStream(false);
+    await stopPublishing(false);
     setStatus(`Could not start camera: ${error.message}`, true);
-    startButton.disabled = false;
-  }
-}
-
-async function switchCamera(deviceId) {
-  if (!track || !deviceId) return;
-  switchButton.disabled = true;
-  cameraSelect.disabled = true;
-  try {
-    await track.setDevice(deviceId);
-    cameraSelect.value = deviceId;
-    setStatus(`Switched to ${cameraSelect.selectedOptions[0]?.textContent || "camera"}.`);
-  } catch (error) {
-    setStatus(`Could not switch camera: ${error.message}`, true);
   } finally {
-    switchButton.disabled = cameras.length < 2;
-    cameraSelect.disabled = cameras.length < 2;
+    publishing = false;
+    if (viewerCount < 1) scheduleIdleStop();
   }
 }
 
-async function stopStream(updateCamera = true) {
+async function stopPublishing(updateCamera = true) {
+  if (stopping) return;
+  stopping = true;
+  clearTimeout(idleStopTimer);
   clearInterval(heartbeatTimer);
   clearInterval(statsTimer);
   heartbeatTimer = undefined;
@@ -201,17 +209,105 @@ async function stopStream(updateCamera = true) {
   track = undefined;
   await client?.leave().catch(() => {});
   client = undefined;
-  await wakeLock?.release().catch(() => {});
-  wakeLock = undefined;
   [...preview.children].forEach((child) => { if (child !== emptyState) child.remove(); });
   emptyState.hidden = false;
-  statsText.textContent = "1080p · 30 fps · H.264 · detail mode";
-  setLive(false);
-  if (updateCamera) setStatus("Stream stopped.");
+  statsText.textContent = "1080p · 30 fps · H.264 · camera off while idle";
+  stopping = false;
+  renderState();
+  if (armed && viewerCount < 1) setStatus("Armed and waiting. Camera capture is off.");
 }
 
-startButton.addEventListener("click", startStream);
-stopButton.addEventListener("click", () => stopStream());
+function handleDemand(message) {
+  viewerCount = Number.isInteger(message.viewers) ? Math.max(0, message.viewers) : (message.active ? 1 : 0);
+  renderState();
+  if (!armed) return;
+  if (viewerCount > 0) {
+    clearTimeout(idleStopTimer);
+    startPublishing();
+  } else {
+    setStatus("No viewers. Stopping camera…");
+    scheduleIdleStop();
+  }
+}
+
+function connectSignaling() {
+  clearTimeout(signalingReconnectTimer);
+  if (!armed || signalingSocket?.readyState === WebSocket.OPEN || signalingSocket?.readyState === WebSocket.CONNECTING) return;
+  signalingSocket = new WebSocket(SIGNAL_URL);
+  signalingSocket.addEventListener("open", () => {
+    signalingSocket.send(JSON.stringify({ type: "auth", role: "camera" }));
+    setStatus("Armed and waiting for a viewer. Camera capture is off.");
+  });
+  signalingSocket.addEventListener("message", (event) => {
+    const message = JSON.parse(event.data);
+    if (message.type === "camera_demand") handleDemand(message);
+    if (message.type === "error") setStatus(message.message, true);
+  });
+  signalingSocket.addEventListener("close", () => {
+    signalingSocket = undefined;
+    viewerCount = 0;
+    renderState();
+    scheduleIdleStop();
+    if (armed) {
+      setStatus("Demand connection lost. Reconnecting…", true);
+      signalingReconnectTimer = setTimeout(connectSignaling, 2500);
+    }
+  });
+}
+
+async function armCamera() {
+  if (armed) return;
+  startButton.disabled = true;
+  setStatus("Requesting rear-camera permission…");
+  try {
+    if (!window.AgoraRTC) throw new Error("Agora SDK did not load");
+    if (!navigator.mediaDevices?.getUserMedia) throw new Error("Camera access requires HTTPS and a supported browser");
+    localStorage.setItem("cpCameraName", cameraName.value.trim());
+    await discoverCameras();
+    armed = true;
+    await requestWakeLock();
+    renderState();
+    connectSignaling();
+    setStatus("Armed and waiting for a viewer. Camera capture is off.");
+  } catch (error) {
+    armed = false;
+    setStatus(`Could not arm camera: ${error.message}`, true);
+    renderState();
+  }
+}
+
+async function disarmCamera() {
+  armed = false;
+  viewerCount = 0;
+  clearTimeout(signalingReconnectTimer);
+  signalingSocket?.close();
+  signalingSocket = undefined;
+  await stopPublishing();
+  await wakeLock?.release().catch(() => {});
+  wakeLock = undefined;
+  renderState();
+  setStatus("Camera disarmed.");
+}
+
+async function switchCamera(deviceId) {
+  if (!armed || !deviceId) return;
+  switchButton.disabled = true;
+  cameraSelect.disabled = true;
+  try {
+    if (track) await track.setDevice(deviceId);
+    cameraSelect.value = deviceId;
+    setStatus(track
+      ? `Switched to ${cameraSelect.selectedOptions[0]?.textContent || "camera"}.`
+      : "Camera selected. Capture remains off until a viewer connects.");
+  } catch (error) {
+    setStatus(`Could not switch camera: ${error.message}`, true);
+  } finally {
+    renderState();
+  }
+}
+
+startButton.addEventListener("click", armCamera);
+stopButton.addEventListener("click", disarmCamera);
 switchButton.addEventListener("click", () => {
   const index = Math.max(0, cameras.findIndex((camera) => camera.deviceId === cameraSelect.value));
   const next = cameras[(index + 1) % cameras.length];
@@ -219,12 +315,17 @@ switchButton.addEventListener("click", () => {
 });
 cameraSelect.addEventListener("change", () => switchCamera(cameraSelect.value));
 document.addEventListener("visibilitychange", () => {
-  if (!document.hidden && track) requestWakeLock();
+  if (!document.hidden && armed) {
+    requestWakeLock();
+    connectSignaling();
+  }
 });
 window.addEventListener("pagehide", () => {
+  armed = false;
+  signalingSocket?.close();
   if (client || track) updateRegistry(false).catch(() => {});
   track?.close();
   client?.leave();
 });
 
-setLive(false);
+renderState();

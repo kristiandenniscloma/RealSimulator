@@ -13,7 +13,7 @@
       <div id="empty" class="empty">
         <span class="lens" aria-hidden="true"></span>
         <strong>Camera ready</strong>
-        <small>Keep this page open while streaming.</small>
+        <small>Arm once, then keep this page open.</small>
       </div>
     </div>
 
@@ -37,12 +37,12 @@
         </select>
       </label>
       <div class="actions">
-        <button id="start" class="primary" type="button">Start 1080p stream</button>
+        <button id="start" class="primary" type="button">Arm automatic camera</button>
         <button id="switch" type="button" disabled>Switch camera</button>
-        <button id="stop" class="danger" type="button" disabled>Stop</button>
+        <button id="stop" class="danger" type="button" disabled>Disarm</button>
       </div>
-      <p id="status" class="status" role="status">Tap Start and allow camera access.</p>
-      <p id="stats" class="stats">1080p · 30 fps · H.264 · detail mode</p>
+      <p id="status" class="status" role="status">Arm once and allow camera access. Capture starts only when someone opens the controller.</p>
+      <p id="stats" class="stats">1080p · 30 fps · H.264 · camera off while idle</p>
     </section>
   </main>
 
